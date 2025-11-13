@@ -1,7 +1,5 @@
-
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { analyzeFiles, generateStructureAndPageMap, findRelevantFiles, generateChapterDetails_Interactive } from './services/geminiService';
+import { analyzeFiles, findRelevantFiles, generateChapterDetails_Interactive } from './services/geminiService';
 import { TutorResponse, FileContent, ReferencedImage, CropCoordinates, MindMapNode, ConversationTurn, ChapterDetails, User, SubjectData, Keyword } from './types';
 
 // @ts-ignore
@@ -157,7 +155,7 @@ const extractPdfPages = async (sourceBase64: string, startPage: number, endPage:
 // --- Helper Components & Icons ---
 const LoadingSpinner: React.FC<{ fullScreen?: boolean; inline?: boolean }> = ({ fullScreen, inline }) => (
     <div className={`flex justify-center items-center ${fullScreen ? 'min-h-screen' : 'p-4'} ${inline ? 'h-full' : ''}`}>
-        <div className={`animate-spin rounded-full border-b-2 border-purple-400 ${inline ? 'h-8 w-8' : 'h-16 w-16'}`}></div>
+        <div className={`animate-spin rounded-full border-b-2 border-gray-400 ${inline ? 'h-8 w-8' : 'h-16 w-16'}`}></div>
     </div>
 );
 const BackIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -165,9 +163,14 @@ const BackIcon: React.FC<{ className?: string }> = ({ className }) => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
     </svg>
 );
-const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
+const AlucidateLogo: React.FC = () => (
+    <h1 className="text-4xl sm:text-5xl font-light text-gray-200 tracking-wider">
+        <span className="font-semibold text-white">AI</span>lucidate
+    </h1>
+);
+const Header: React.FC<{ subtitle?: string }> = ({ subtitle }) => (
     <header className="text-center mb-8">
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-600">{title}</h1>
+        <AlucidateLogo />
         {subtitle && <p className="mt-2 text-gray-400">{subtitle}</p>}
     </header>
 );
@@ -192,11 +195,24 @@ export default function App() {
                     return;
                 }
             }
+
+            // For testing convenience, automatically log in a default user.
+            const defaultUser: User = { email: 'test@example.com', name: 'Test User', className: 'Class 10' };
+            let user = await dbService.getUser(defaultUser.email);
+            if (!user) {
+                await dbService.addUser(defaultUser);
+                user = defaultUser;
+            }
+            localStorage.setItem('currentUserEmail', user.email);
+            setCurrentUser(user);
+            const hasSubjects = await dbService.hasSubjects();
+            setAppState(hasSubjects ? 'dashboard' : 'admin');
+
         } catch (error) {
             console.error("Error checking auth status:", error);
+            localStorage.removeItem('currentUserEmail');
+            setAppState('auth');
         }
-        localStorage.removeItem('currentUserEmail');
-        setAppState('auth');
     }, []);
 
     useEffect(() => {
@@ -265,26 +281,26 @@ const AuthView: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) => {
     return (
         <div className="min-h-screen flex items-center justify-center p-4 bg-gray-900">
             <div className="max-w-md w-full">
-                <Header title="AI Syllabus Tutor" subtitle={isLogin ? "Welcome back! Please log in." : "Create your student account."} />
+                <Header subtitle={isLogin ? "Welcome back! Please log in." : "Create your student account."} />
                 <div className="bg-gray-800/50 p-8 rounded-xl border border-gray-700 shadow-lg">
                     {isLogin ? (
                         <form onSubmit={handleLogin} className="space-y-6">
-                            <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="Email Address" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:outline-none" />
+                            <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="Email Address" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-gray-400 focus:outline-none" />
                             {loginError && <p className="text-red-400 text-sm">{loginError}</p>}
-                            <button type="submit" className="w-full bg-purple-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-purple-700 transition">Log In</button>
+                            <button type="submit" className="w-full bg-white text-black font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition">Log In</button>
                         </form>
                     ) : (
                          <form onSubmit={handleSignup} className="space-y-4">
-                            <input type="text" value={signupName} onChange={e => setSignupName(e.target.value)} placeholder="Full Name" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:outline-none" />
-                            <input type="text" value={signupClass} onChange={e => setSignupClass(e.target.value)} placeholder="Class (e.g., Class 10)" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:outline-none" />
-                            <input type="email" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} placeholder="Email Address" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:outline-none" />
+                            <input type="text" value={signupName} onChange={e => setSignupName(e.target.value)} placeholder="Full Name" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-gray-400 focus:outline-none" />
+                            <input type="text" value={signupClass} onChange={e => setSignupClass(e.target.value)} placeholder="Class (e.g., Class 10)" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-gray-400 focus:outline-none" />
+                            <input type="email" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} placeholder="Email Address" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-gray-400 focus:outline-none" />
                             {signupError && <p className="text-red-400 text-sm">{signupError}</p>}
-                            <button type="submit" className="w-full bg-purple-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-purple-700 transition">Sign Up</button>
+                            <button type="submit" className="w-full bg-white text-black font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition">Sign Up</button>
                         </form>
                     )}
                     <p className="text-center text-sm text-gray-400 mt-6">
                         {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
-                        <button onClick={() => setIsLogin(!isLogin)} className="font-medium text-purple-400 hover:underline">
+                        <button onClick={() => setIsLogin(!isLogin)} className="font-medium text-gray-300 hover:underline hover:text-white">
                             {isLogin ? 'Sign Up' : 'Log In'}
                         </button>
                     </p>
@@ -320,91 +336,83 @@ const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: ()
 
     const handleSave = async () => {
         if (!files || files.length === 0 || !className || !subject) {
-            setError("Please provide a Class, Subject, and at least one PDF file.");
+            setError("Please provide a Class, Subject, and at least one PDF file (each PDF is one chapter).");
             return;
         }
         setIsProcessing(true);
         setError('');
         setSuccess('');
-        
+
         try {
             const subjectId = `${className}-${subject}`;
             const existingSubject = await dbService.getSubject(subjectId);
-            
-            const newFileContents: FileContent[] = [];
-            const newFileStructures: MindMapNode[] = [];
+            let subjectToUpdate: SubjectData;
 
-            // Stage 1: Process newly uploaded files
+            if (existingSubject) {
+                subjectToUpdate = existingSubject;
+            } else {
+                subjectToUpdate = {
+                    id: subjectId,
+                    className,
+                    subject,
+                    files: [],
+                    structure: { id: "root", title: subject, children: [], startPage: 0, endPage: 0, fileName: 'subject' }
+                };
+            }
+
+            const startChapterNumber = subjectToUpdate.structure.children.length;
+            const newChapterMindMaps: MindMapNode[] = [];
+            let newFilesAdded = 0;
+
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                if (existingSubject && existingSubject.files.some(f => f.fileName === file.name)) {
+                const chapterNumber = startChapterNumber + i + 1;
+
+                if (subjectToUpdate.files.some(f => f.fileName === file.name)) {
                     setStatus(`Skipping "${file.name}" as it already exists for this subject.`);
                     continue;
                 }
 
-                setStatus(`Processing "${file.name}"...`);
+                setStatus(`Processing Chapter ${chapterNumber}: "${file.name}"...`);
                 const fileBase64 = await toBase64(file);
                 const pdfData = base64ToUint8Array(fileBase64);
-                const pdf = await pdfjsLib.getDocument({data: pdfData}).promise;
-                const content = { fileName: file.name, fileBase64, totalPages: pdf.numPages };
-                newFileContents.push(content);
+                const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+
+                const chapterFileContent: FileContent = {
+                    fileName: file.name,
+                    fileBase64,
+                    totalPages: pdf.numPages
+                };
+
+                setStatus(`Generating details for Chapter ${chapterNumber}...`);
+                const details = await generateChapterDetails_Interactive(chapterFileContent, chapterNumber);
+                const chapterId = details.mindMap.id;
+
+                const chapterDetails: ChapterDetails = {
+                    ...details,
+                    id: `${subjectId}-${chapterId}`,
+                    subjectId: subjectId,
+                    chapterId: chapterId,
+                };
                 
-                setStatus(`Generating page map for "${file.name}"...`);
-                const structure = await generateStructureAndPageMap(content);
-                newFileStructures.push(structure);
+                await dbService.saveChapterDetails(chapterDetails);
+
+                newChapterMindMaps.push(details.mindMap);
+                subjectToUpdate.files.push(chapterFileContent);
+                newFilesAdded++;
             }
 
-            if (newFileContents.length === 0) {
+            if (newFilesAdded === 0) {
                 setSuccess("No new files to add. Subject is already up-to-date.");
                 setIsProcessing(false);
                 return;
             }
 
-            const finalFileContents = existingSubject ? [...existingSubject.files, ...newFileContents] : newFileContents;
-            const finalStructure: MindMapNode = existingSubject
-                ? { ...existingSubject.structure, children: [...existingSubject.structure.children, ...newFileStructures] }
-                : { id: "root", title: subject, children: newFileStructures, startPage: 1, endPage: 1, fileName: 'subject' };
-            
-            const subjectData: SubjectData = { id: subjectId, className, subject, files: finalFileContents, structure: finalStructure };
-            await dbService.saveSubject(subjectData);
+            subjectToUpdate.structure.children.push(...newChapterMindMaps);
+            await dbService.saveSubject(subjectToUpdate);
 
-            // Stage 2: Extract chapters and generate details for NEW books only
-            for (const bookNode of newFileStructures) {
-                 for (const chapterNode of bookNode.children) {
-                    if (chapterNode.startPage === 0 || chapterNode.endPage === 0 || chapterNode.startPage > chapterNode.endPage) {
-                        console.warn(`Skipping chapter "${chapterNode.title}" due to invalid page range.`);
-                        continue;
-                    }
-
-                    setStatus(`Extracting Chapter ${chapterNode.id}: ${chapterNode.title}...`);
-                    const sourceFile = newFileContents.find(f => f.fileName === chapterNode.fileName);
-                    if (!sourceFile) continue;
-
-                    const chapterBase64 = await extractPdfPages(sourceFile.fileBase64, chapterNode.startPage, chapterNode.endPage);
-                    const chapterFileContent: FileContent = {
-                        fileName: `Chapter_${chapterNode.id}.pdf`,
-                        fileBase64: chapterBase64,
-                        totalPages: chapterNode.endPage - chapterNode.startPage + 1
-                    };
-                    
-                    setStatus(`Generating details for Chapter ${chapterNode.id}: ${chapterNode.title}...`);
-                    const details = await generateChapterDetails_Interactive(chapterFileContent, chapterNode.title);
-                    
-                    const chapterDetails: ChapterDetails = {
-                        ...details,
-                        id: `${subjectId}-${chapterNode.id}`,
-                        subjectId: subjectId,
-                        chapterId: chapterNode.id,
-                        chapterTitle: chapterNode.title,
-                    };
-                    await dbService.saveChapterDetails(chapterDetails);
-                }
-            }
-
-            setSuccess(`Successfully saved "${subject}" for "${className}".`);
+            setSuccess(`Successfully added ${newFilesAdded} new chapter(s) to "${subject}".`);
             setFiles(null);
-            setClassName('');
-            setSubject('');
             const fileInput = document.getElementById('file-upload') as HTMLInputElement;
             if (fileInput) fileInput.value = '';
 
@@ -421,27 +429,27 @@ const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: ()
             <div className="max-w-4xl mx-auto">
                 <div className="flex justify-between items-center mb-4">
                     <p className="text-gray-400">Welcome, {user.name} (Admin)</p>
-                    <button onClick={onLogout} className="text-purple-400 hover:underline">Logout</button>
+                    <button onClick={onLogout} className="text-gray-400 hover:underline">Logout</button>
                 </div>
-                <Header title="Admin Panel" subtitle="Upload syllabus to build the knowledge base." />
+                <Header subtitle="Upload syllabus to build the knowledge base." />
                 <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 space-y-4">
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <input type="text" value={className} onChange={(e) => setClassName(e.target.value)} placeholder="Class (e.g., Class 10)" className="bg-gray-700 border border-gray-600 rounded-lg p-3" />
                         <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject (e.g., Physics)" className="bg-gray-700 border border-gray-600 rounded-lg p-3" />
                     </div>
                     <label className="block w-full text-center cursor-pointer bg-gray-700 hover:bg-gray-600 py-3 px-5 rounded-lg border border-gray-600">
-                        <span>{files && files.length > 0 ? `${files.length} files selected` : 'Choose Textbooks (.pdf, multiple allowed)'}</span>
+                        <span>{files && files.length > 0 ? `${files.length} files selected` : 'Choose Chapters (.pdf, multiple allowed)'}</span>
                         <input id="file-upload" type="file" onChange={handleFileChange} className="hidden" accept=".pdf" multiple />
                     </label>
-                    <button onClick={handleSave} disabled={isProcessing} className="w-full bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 disabled:bg-gray-600">
+                    <button onClick={handleSave} disabled={isProcessing} className="w-full bg-white text-black font-bold py-3 rounded-lg hover:bg-gray-300 disabled:bg-gray-500 disabled:cursor-not-allowed">
                         {isProcessing ? 'Processing...' : 'Save Subject'}
                     </button>
-                    {isProcessing && <div className="text-center text-purple-400 mt-2">{status}</div>}
+                    {isProcessing && <div className="text-center text-gray-300 mt-2">{status}</div>}
                     {error && <div className="text-red-400 bg-red-900/50 p-4 rounded-lg mt-4">{error}</div>}
                     {success && <div className="text-green-400 bg-green-900/50 p-4 rounded-lg mt-4">{success}</div>}
                 </div>
                 <div className="text-center mt-6">
-                    <button onClick={onCorpusUpdate} className="text-purple-400 hover:text-purple-300">
+                    <button onClick={onCorpusUpdate} className="text-gray-300 hover:text-white">
                         Done Uploading, Go to Dashboard &rarr;
                     </button>
                 </div>
@@ -479,14 +487,14 @@ const DashboardView: React.FC<{ user: User; onLogout: () => void; onSwitchToAdmi
             <div className="max-w-4xl mx-auto">
                  <div className="flex justify-between items-center mb-4">
                     <p className="text-gray-400">Welcome, {user.name} ({user.className})</p>
-                    <button onClick={onLogout} className="text-purple-400 hover:underline">Logout</button>
+                    <button onClick={onLogout} className="text-gray-400 hover:underline">Logout</button>
                 </div>
-                <Header title="Student Dashboard" subtitle="Select a subject to begin your study session." />
+                <Header subtitle="Select a subject to begin your study session." />
                 <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700">
                     {isLoading ? <LoadingSpinner /> : (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             {subjects.map(sub => (
-                                <button key={sub.id} onClick={() => setSelectedSubject(sub)} className="text-center bg-gray-700/50 p-4 rounded-lg border border-gray-600 hover:bg-purple-800/50 hover:border-purple-600 transition-all">
+                                <button key={sub.id} onClick={() => setSelectedSubject(sub)} className="text-center bg-gray-700/50 p-4 rounded-lg border border-gray-600 hover:bg-gray-700 hover:border-gray-500 transition-all">
                                     {sub.subject}
                                 </button>
                             ))}
@@ -543,21 +551,21 @@ const SubjectHomeView: React.FC<{ subject: SubjectData; onBack: () => void; user
          <div className="min-h-screen bg-gray-900 text-gray-200 p-8">
             <div className="max-w-4xl mx-auto">
                 <header className="mb-8 relative">
-                    <button onClick={onBack} className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center text-purple-400 hover:text-purple-300">
+                    <button onClick={onBack} className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center text-gray-300 hover:text-white">
                         <BackIcon className="h-5 w-5 mr-1"/> Back
                     </button>
                     <div className="text-center">
-                        <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-600">{subject.subject}</h1>
+                        <h1 className="text-4xl sm:text-5xl font-bold text-gray-100">{subject.subject}</h1>
                         <p className="mt-2 text-gray-400">{user.className}</p>
                     </div>
                 </header>
                  <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700">
-                    <h2 className="text-xl font-semibold text-purple-300 mb-4">Chapters</h2>
+                    <h2 className="text-xl font-semibold text-gray-200 mb-4">Chapters</h2>
                      {isLoading ? <LoadingSpinner /> : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {chapters.map(chapter => (
-                                <button key={chapter.id} onClick={() => setSelectedChapter(chapter)} className="text-left p-4 bg-gray-700/50 rounded-lg border border-gray-600 hover:bg-purple-800/50 hover:border-purple-600 transition-all">
-                                    <span className="font-mono text-xs text-purple-300">Chapter {chapter.chapterId}</span>
+                                <button key={chapter.id} onClick={() => setSelectedChapter(chapter)} className="text-left p-4 bg-gray-700/50 rounded-lg border border-gray-600 hover:bg-gray-700 hover:border-gray-500 transition-all">
+                                    <span className="font-mono text-xs text-gray-400">Chapter {chapter.chapterId}</span>
                                     <h3 className="font-semibold mt-1">{chapter.chapterTitle}</h3>
                                 </button>
                             ))}
@@ -583,12 +591,7 @@ const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onB
     }, [conversation, isAnswering]);
 
     const findChapterNode = (structure: MindMapNode, chapterId: string): MindMapNode | null => {
-        for (const book of structure.children) {
-            for (const chap of book.children) {
-                if (chap.id === chapterId) return chap;
-            }
-        }
-        return null;
+        return structure.children.find(chap => chap.id === chapterId) || null;
     }
 
     const handleAnalysis = async () => {
@@ -601,18 +604,14 @@ const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onB
 
             const sourceFile = subject.files.find(f => f.fileName === chapterNode.fileName);
             if (!sourceFile) throw new Error("Could not find source PDF for this chapter.");
-
-            const chapterBase64 = await extractPdfPages(sourceFile.fileBase64, chapterNode.startPage, chapterNode.endPage);
-            const chapterFileContent: FileContent = {
-                fileName: sourceFile.fileName, // Use original filename for citation
-                fileBase64: chapterBase64,
-                totalPages: chapterNode.endPage - chapterNode.startPage + 1
-            };
+            
+            // The entire source file IS the chapter PDF now
+            const chapterFileContent: FileContent = { ...sourceFile };
 
             const result = await analyzeFiles(query, [chapterFileContent], conversation, { 
                 chapterId: chapter.chapterId, 
                 chapterTitle: chapter.chapterTitle,
-                pageOffset: chapterNode.startPage - 1 // Important for correct citation
+                pageOffset: chapterNode.startPage - 1 
             });
             setConversation(prev => [...prev, { query, response: result }]);
             setQuery('');
@@ -635,11 +634,11 @@ const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onB
         <div className="h-screen bg-gray-900 text-gray-200 flex flex-col p-4 sm:p-6 lg:p-8">
             <div className="max-w-4xl mx-auto w-full flex flex-col flex-grow min-h-0">
                 <header className="mb-4 relative flex-shrink-0">
-                    <button onClick={onBack} className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center text-purple-400 hover:text-purple-300">
+                    <button onClick={onBack} className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center text-gray-300 hover:text-white">
                         <BackIcon className="h-5 w-5 mr-1"/> Back to Chapters
                     </button>
                     <div className="text-center">
-                        <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-600">{chapter.chapterTitle}</h1>
+                        <h1 className="text-3xl font-bold text-gray-100">{chapter.chapterTitle}</h1>
                         <p className="mt-1 text-gray-400">Chapter {chapter.chapterId} - {subject.subject}</p>
                     </div>
                 </header>
@@ -647,7 +646,7 @@ const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onB
                 <main className="flex-grow space-y-4 overflow-y-auto mb-4 pr-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
                     <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 space-y-6">
                         <div>
-                            <h3 className="font-semibold text-lg text-purple-300 mb-2">Summary</h3>
+                            <h3 className="font-semibold text-lg text-gray-200 mb-2">Summary</h3>
                             <p className="text-gray-300">{chapter.summary}</p>
                         </div>
                         <KeywordsDisplay keywords={chapter.keywords} />
@@ -675,10 +674,10 @@ const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onB
                                 id="chat-input"
                                 type="text" value={query} onChange={(e) => setQuery(e.target.value)}
                                 placeholder={`Ask about "${chapter.chapterTitle}"...`}
-                                className="flex-grow bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                                className="flex-grow bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-gray-400 focus:outline-none"
                                 onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleAnalysis()}
                             />
-                            <button onClick={handleAnalysis} disabled={isAnswering || !query} className="bg-purple-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-purple-700 disabled:bg-gray-600">
+                            <button onClick={handleAnalysis} disabled={isAnswering || !query} className="bg-white text-black font-bold py-3 px-6 rounded-lg hover:bg-gray-300 disabled:bg-gray-500 disabled:cursor-not-allowed">
                                 Ask
                             </button>
                         </div>
@@ -704,7 +703,7 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
                 style={{ transform: 'scale(1)' }} // Animate in
             >
                 <div className="flex justify-between items-center p-4 border-b border-gray-700">
-                    <h3 className="text-xl font-bold text-purple-300">{title}</h3>
+                    <h3 className="text-xl font-bold text-gray-200">{title}</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
                 </div>
                 <div className="p-6 text-gray-300">{children}</div>
@@ -726,17 +725,17 @@ const KeywordsDisplay: React.FC<{ keywords: Keyword[] }> = ({ keywords }) => {
 
     return (
         <div>
-            <h3 className="font-semibold text-lg text-purple-300 mb-2">Keywords</h3>
+            <h3 className="font-semibold text-lg text-gray-200 mb-2">Keywords</h3>
             <div className="flex flex-wrap gap-2">
                 {keywords.map(kw => (
-                    <button key={kw.term} onClick={() => setSelectedKeyword(kw)} className="text-xs text-gray-300 bg-gray-700/80 py-1 px-3 rounded-full hover:bg-purple-800/50 transition">
+                    <button key={kw.term} onClick={() => setSelectedKeyword(kw)} className="text-xs text-gray-300 bg-gray-700/80 py-1 px-3 rounded-full hover:bg-gray-600 transition">
                         {kw.term}
                     </button>
                 ))}
             </div>
             {selectedKeyword && (
                 <div className="mt-4 p-4 bg-gray-900/50 rounded-md border border-gray-700">
-                    <h4 className="font-bold text-purple-300">{selectedKeyword.term}</h4>
+                    <h4 className="font-bold text-gray-200">{selectedKeyword.term}</h4>
                     <p className="text-gray-300 mt-1">{selectedKeyword.definition}</p>
                 </div>
             )}
@@ -756,17 +755,26 @@ const InteractiveMindMapView: React.FC<{ mindMap: MindMapNode; onAskQuestion: (q
 
     const RenderNode: React.FC<{ node: MindMapNode; level: number }> = ({ node, level }) => (
         <div style={{ marginLeft: `${level * 20}px` }} className="my-1">
-            <button onClick={() => setActiveNode(node)} className={`w-full text-left flex items-center p-2 rounded-md transition-colors ${activeNode?.id === node.id ? 'bg-purple-800/80' : 'bg-gray-700/50 hover:bg-gray-700'}`}>
-                <span className="font-mono text-xs mr-2 text-purple-300">{node.id}</span>
+            <button onClick={() => setActiveNode(node)} className={`w-full text-left flex items-center p-2 rounded-md transition-colors ${activeNode?.id === node.id ? 'bg-gray-600' : 'bg-gray-700/50 hover:bg-gray-700'}`}>
+                <span className="font-mono text-xs mr-2 text-gray-400">{node.id}</span>
                 <span className="font-medium">{node.title}</span>
             </button>
             {node.children && node.children.map(child => <RenderNode key={child.id} node={child} level={level + 1} />)}
         </div>
     );
 
+    if (!mindMap) {
+        return (
+             <div>
+                <h3 className="font-semibold text-lg text-gray-200 mb-2">Chapter Flowchart</h3>
+                <p className="p-4 text-gray-400">No flowchart available for this chapter.</p>
+            </div>
+        )
+    }
+
     return (
         <div>
-            <h3 className="font-semibold text-lg text-purple-300 mb-2">Chapter Flowchart</h3>
+            <h3 className="font-semibold text-lg text-gray-200 mb-2">Chapter Flowchart</h3>
             <div className="p-2 border border-gray-700 rounded-lg bg-gray-900/50 max-h-96 overflow-y-auto">
                 <RenderNode node={mindMap} level={0} />
             </div>
@@ -777,7 +785,7 @@ const InteractiveMindMapView: React.FC<{ mindMap: MindMapNode; onAskQuestion: (q
                 title={activeNode?.title ?? ''}
                 footer={
                     activeNode?.explanation ? (
-                        <button onClick={handleReadMore} className="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 transition">
+                        <button onClick={handleReadMore} className="bg-white text-black font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition">
                             Read More &rarr;
                         </button>
                     ) : undefined
@@ -794,13 +802,20 @@ const Equation: React.FC<{ content: string; displayMode: boolean }> = ({ content
     const ref = useRef<HTMLSpanElement>(null);
     useEffect(() => {
         if (ref.current) {
-            try {
-                katex.render(content, ref.current, {
-                    throwOnError: false,
-                    displayMode,
-                });
-            } catch (error) {
-                console.error("KaTeX rendering error:", error);
+            // Check if katex is loaded and available on the window object
+            if (typeof katex !== 'undefined' && katex) {
+                try {
+                    katex.render(content, ref.current, {
+                        throwOnError: false,
+                        displayMode,
+                    });
+                } catch (error) {
+                    console.error("KaTeX rendering error:", error);
+                    // Fallback to text content if rendering fails
+                    ref.current.textContent = content;
+                }
+            } else {
+                // If katex is not loaded, just display the raw content as a fallback
                 ref.current.textContent = content;
             }
         }
@@ -809,7 +824,7 @@ const Equation: React.FC<{ content: string; displayMode: boolean }> = ({ content
 };
 
 // --- PDF Image Renderer ---
-const ImageViewer: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[] }> = ({ image, sourceFiles }) => {
+const ImageViewer: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]; onEnlarge?: (image: ReferencedImage) => void; }> = ({ image, sourceFiles, onEnlarge }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -851,27 +866,8 @@ const ImageViewer: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]
                 if (!canvas) return;
                 
                 const { x, y, width, height } = image.cropCoordinates;
-
-                // pdf.js viewport origin is bottom-left, but our coordinates are top-left
-                // pdf-lib's origin is bottom-left as well
-                // The AI is likely providing top-left based coordinates from a standard viewer.
-                // y in pdf.js is from bottom, so we need to convert.
                 const cropX = x * scale;
-                // The provided y seems to be from the top. Viewport y is from the bottom.
-                // To get the correct starting y for drawImage, we need to calculate it from the bottom of the source (hidden) canvas.
-                // The crop's top edge is `y` from the top of the page. So the bottom edge is `y + height`.
-                // In viewport coordinates, the bottom edge is at `viewport.height - (y + height) * scale`. This is where our crop should start.
-                // Let's re-verify the coordinate systems. `drawImage`'s source `y` is from the top.
-                // `hiddenCanvas` has its origin at the top-left.
-                // The `y` coordinate for a crop should be from the top of the source image.
-                // So, if the AI gives y from the top, we can use it directly, but need to check if pdf.js's rendered canvas is oriented that way. It is.
-                // However, the cropCoordinates from Gemini seem to be relative to the page's original dimensions, where (0,0) is top-left.
-                // Let's assume the coordinates are correct and our transformation was wrong.
-                
-                // The original code was `const cropY = viewport.height - (y + height) * scale;`
-                // Let's try `const cropY = y * scale;` assuming (0,0) is top-left for both source and crop.
                 const cropY = y * scale;
-
                 const cropWidth = width * scale;
                 const cropHeight = height * scale;
 
@@ -882,14 +878,8 @@ const ImageViewer: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]
 
                 ctx.drawImage(
                     hiddenCanvas,
-                    cropX,
-                    cropY, // Use the calculated y
-                    cropWidth,
-                    cropHeight,
-                    0,
-                    0,
-                    cropWidth,
-                    cropHeight
+                    cropX, cropY, cropWidth, cropHeight,
+                    0, 0, cropWidth, cropHeight
                 );
 
             } catch (err: any) {
@@ -903,8 +893,10 @@ const ImageViewer: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]
         renderPdfCrop();
     }, [image, sourceFiles]);
 
+    const containerClasses = `bg-gray-900/50 p-4 rounded-lg border border-gray-700 flex flex-col items-center justify-center min-h-[200px] ${onEnlarge ? 'cursor-zoom-in' : ''}`;
+
     return (
-        <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 flex flex-col items-center justify-center min-h-[200px]">
+        <div className={containerClasses} onClick={onEnlarge ? () => onEnlarge(image) : undefined}>
             {isLoading && <LoadingSpinner inline />}
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
             <canvas ref={canvasRef} className={`transition-opacity duration-300 ${isLoading || error ? 'opacity-0' : 'opacity-100'}`} style={{ maxWidth: '100%', height: 'auto' }} />
@@ -913,10 +905,31 @@ const ImageViewer: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]
     );
 };
 
+const ImageModal: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]; onClose: () => void; }> = ({ image, sourceFiles, onClose }) => {
+    return (
+        <div 
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+            onClick={onClose}
+        >
+            <div className="relative max-w-4xl max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                <ImageViewer image={image} sourceFiles={sourceFiles} />
+                <button 
+                    onClick={onClose} 
+                    className="absolute -top-2 -right-2 text-white bg-gray-800 rounded-full h-8 w-8 flex items-center justify-center text-2xl hover:bg-gray-700 border border-gray-600"
+                    aria-label="Close image view"
+                >
+                    &times;
+                </button>
+            </div>
+        </div>
+    );
+};
+
 
 // --- Tutor Response View ---
 const TutorResponseView: React.FC<{ response: TutorResponse, sourceFiles: FileContent[] }> = ({ response, sourceFiles }) => {
-    
+    const [enlargedImage, setEnlargedImage] = useState<ReferencedImage | null>(null);
+
     const renderAnswer = useMemo(() => {
         const parts = response.answer.split(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g);
         return parts.map((part, index) => {
@@ -937,22 +950,22 @@ const TutorResponseView: React.FC<{ response: TutorResponse, sourceFiles: FileCo
     return (
         <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 shadow-lg mt-4">
             <div className="space-y-6">
-                <div className="prose prose-invert max-w-none prose-p:text-gray-300 prose-headings:text-purple-300">
+                <div className="prose prose-invert max-w-none prose-p:text-gray-300 prose-headings:text-gray-100">
                     {renderAnswer}
                 </div>
                  {response.images && response.images.length > 0 && (
                     <div>
-                        <h3 className="font-semibold text-lg text-purple-300 mb-2 mt-4">Referenced Images</h3>
+                        <h3 className="font-semibold text-lg text-gray-200 mb-2 mt-4">Referenced Images</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {response.images.map((img, index) => (
-                                <ImageViewer key={index} image={img} sourceFiles={sourceFiles} />
+                                <ImageViewer key={index} image={img} sourceFiles={sourceFiles} onEnlarge={setEnlargedImage}/>
                             ))}
                         </div>
                     </div>
                 )}
                  {response.citations.length > 0 && (
                     <div>
-                        <h3 className="font-semibold text-lg text-purple-300 mb-2 mt-4">References</h3>
+                        <h3 className="font-semibold text-lg text-gray-200 mb-2 mt-4">References</h3>
                         <ul className="space-y-1 list-disc list-inside bg-gray-900/50 p-4 rounded-md">
                             {response.citations.map((cite, index) => (
                                 <li key={index} className="text-sm text-gray-400">
@@ -964,7 +977,7 @@ const TutorResponseView: React.FC<{ response: TutorResponse, sourceFiles: FileCo
                 )}
                  {response.sources && response.sources.length > 0 && (
                      <div>
-                        <h3 className="font-semibold text-lg text-purple-300 mb-2 mt-4">Sources Consulted</h3>
+                        <h3 className="font-semibold text-lg text-gray-200 mb-2 mt-4">Sources Consulted</h3>
                         <ul className="flex flex-wrap gap-2">
                             {response.sources.map((source, index) => (
                                 <li key={index} className="text-xs text-gray-300 bg-gray-700/80 py-1 px-3 rounded-full">
@@ -975,6 +988,13 @@ const TutorResponseView: React.FC<{ response: TutorResponse, sourceFiles: FileCo
                     </div>
                 )}
             </div>
+            {enlargedImage && (
+                <ImageModal 
+                    image={enlargedImage} 
+                    sourceFiles={sourceFiles} 
+                    onClose={() => setEnlargedImage(null)} 
+                />
+            )}
         </div>
     );
 };

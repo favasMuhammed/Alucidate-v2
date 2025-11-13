@@ -36,58 +36,13 @@ const createMindMapNodeSchema = (depth: number, withExplanation: boolean): objec
     };
 };
 
-
-export const generateStructureAndPageMap = async (file: FileContent): Promise<MindMapNode> => {
-    const model = "gemini-2.5-flash";
-    const systemInstruction = `You are an expert in document analysis. Your task is to analyze a textbook PDF and create a precise, hierarchical table of contents, including the exact start and end page numbers for every section.
-    
-    Instructions:
-    1.  Thoroughly scan the document to identify its structure (chapters, main sections).
-    2.  The root node should be the book's title. Its ID should be "1".
-    3.  Assign hierarchical IDs to each node (e.g., chapter '1.1', its first section '1.1.1').
-    4.  CRITICAL: For each node, you MUST provide the accurate 'startPage' and 'endPage'.
-    5.  Return a single JSON object for the root node. Do not include explanations.`;
-
-    const mindMapSchema = {
-        type: Type.OBJECT,
-        properties: {
-            root: createMindMapNodeSchema(5, false), // No explanations, but with page numbers
-        },
-        required: ["root"],
-    };
-
-    try {
-        const response = await ai.models.generateContent({
-            model: model,
-            contents: [
-                { text: `Generate a structural map with page numbers for the textbook named "${file.fileName}".` },
-                { inlineData: { mimeType: 'application/pdf', data: file.fileBase64 } }
-            ],
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: mindMapSchema,
-                systemInstruction: systemInstruction,
-            },
-        });
-        const parsed = JSON.parse(response.text.trim());
-        
-        // Recursively add the fileName to each node
-        const addFileName = (node: MindMapNode): MindMapNode => ({
-            ...node,
-            fileName: file.fileName,
-            children: node.children.map(addFileName),
-        });
-
-        return addFileName(parsed.root);
-    } catch (error) {
-        console.error(`Error generating page map for ${file.fileName}:`, error);
-        throw new Error(`Failed to generate page map for ${file.fileName}.`);
-    }
-};
-
 const interactiveChapterDetailsSchema = {
     type: Type.OBJECT,
     properties: {
+        chapterTitle: {
+            type: Type.STRING,
+            description: "The title of the chapter, extracted from the most prominent heading on the first page."
+        },
         summary: {
             type: Type.STRING,
             description: "A concise, 3-5 sentence summary of the chapter."
@@ -106,29 +61,30 @@ const interactiveChapterDetailsSchema = {
         },
         mindMap: createMindMapNodeSchema(5, true) // Mind map with explanations
     },
-    required: ["summary", "keywords", "mindMap"]
+    required: ["chapterTitle", "summary", "keywords", "mindMap"]
 };
 
 export const generateChapterDetails_Interactive = async (
-    chapterPdfFile: FileContent, // This is now a PDF containing ONLY the chapter pages
-    chapterTitle: string
-): Promise<Omit<ChapterDetails, 'id' | 'subjectId' | 'chapterId' | 'chapterTitle'>> => {
+    chapterPdfFile: FileContent,
+    chapterNumber: number
+): Promise<Omit<ChapterDetails, 'id' | 'subjectId' | 'chapterId'>> => {
     const model = "gemini-2.5-pro";
     const systemInstruction = `You are an expert academic assistant. The user has provided a PDF containing a single chapter. Your task is to generate a comprehensive, interactive learning module for it.
 
     Instructions:
-    1.  The content is from a chapter titled "${chapterTitle}".
+    1.  Identify the chapter's title from the most prominent heading on the first page.
     2.  Provide a concise summary (3-5 sentences).
     3.  Identify 5-10 essential keywords and provide a clear, 1-2 sentence definition for each.
-    4.  Generate a detailed, hierarchical mind map for THIS chapter. The root of this mind map should be the chapter itself. Each node MUST include a 2-3 sentence 'explanation'.
-    5.  CRITICAL: The 'startPage' and 'endPage' for all nodes in the mind map should be relative to the provided chapter PDF (i.e., starting from page 1).
-    6.  Return a single JSON object matching the required schema.`;
+    4.  Generate a detailed, hierarchical mind map for THIS chapter.
+    5.  CRITICAL: The root node ID of the mind map MUST be "${chapterNumber}". All subsequent node IDs MUST be hierarchical, starting with the chapter number (e.g., "${chapterNumber}.1", "${chapterNumber}.1.1", etc.).
+    6.  The 'startPage' and 'endPage' for all nodes in the mind map should be relative to the provided chapter PDF (i.e., starting from page 1).
+    7.  Return a single JSON object matching the required schema.`;
 
     try {
         const response = await ai.models.generateContent({
             model: model,
             contents: [
-                { text: `Analyze the provided chapter PDF titled "${chapterTitle}".` },
+                { text: `Analyze the provided chapter PDF for Chapter ${chapterNumber}.` },
                 { inlineData: { mimeType: 'application/pdf', data: chapterPdfFile.fileBase64 } }
             ],
             config: {
@@ -141,8 +97,8 @@ export const generateChapterDetails_Interactive = async (
         return JSON.parse(jsonStr);
     } catch (error)
     {
-        console.error(`Error generating details for chapter ${chapterTitle}:`, error);
-        throw new Error(`Failed to generate details for chapter ${chapterTitle}.`);
+        console.error(`Error generating details for chapter ${chapterNumber}:`, error);
+        throw new Error(`Failed to generate details for chapter ${chapterNumber}.`);
     }
 };
 
