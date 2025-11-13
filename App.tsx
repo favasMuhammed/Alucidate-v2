@@ -6,7 +6,6 @@ import { TutorResponse, FileContent, ReferencedImage, CropCoordinates, MindMapNo
 import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.mjs';
 
 declare const marked: any;
-declare const katex: any;
 declare const PDFLib: any;
 
 if (typeof window !== 'undefined') {
@@ -310,6 +309,15 @@ const AuthView: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) => {
     );
 };
 
+// --- Data Processing Helper ---
+const addFileNameToMindMapNode = (node: MindMapNode, fileName: string): void => {
+    node.fileName = fileName;
+    if (node.children && node.children.length > 0) {
+        for (const child of node.children) {
+            addFileNameToMindMapNode(child, fileName);
+        }
+    }
+};
 
 // --- Admin View ---
 const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: () => void; }> = ({ onCorpusUpdate, user, onLogout }) => {
@@ -386,6 +394,10 @@ const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: ()
 
                 setStatus(`Generating details for Chapter ${chapterNumber}...`);
                 const details = await generateChapterDetails_Interactive(chapterFileContent, chapterNumber);
+                
+                // Recursively add the filename to every node in the mind map
+                addFileNameToMindMapNode(details.mindMap, file.name);
+
                 const chapterId = details.mindMap.id;
 
                 const chapterDetails: ChapterDetails = {
@@ -797,32 +809,6 @@ const InteractiveMindMapView: React.FC<{ mindMap: MindMapNode; onAskQuestion: (q
     );
 };
 
-// --- Equation Renderer ---
-const Equation: React.FC<{ content: string; displayMode: boolean }> = ({ content, displayMode }) => {
-    const ref = useRef<HTMLSpanElement>(null);
-    useEffect(() => {
-        if (ref.current) {
-            // Check if katex is loaded and available on the window object
-            if (typeof katex !== 'undefined' && katex) {
-                try {
-                    katex.render(content, ref.current, {
-                        throwOnError: false,
-                        displayMode,
-                    });
-                } catch (error) {
-                    console.error("KaTeX rendering error:", error);
-                    // Fallback to text content if rendering fails
-                    ref.current.textContent = content;
-                }
-            } else {
-                // If katex is not loaded, just display the raw content as a fallback
-                ref.current.textContent = content;
-            }
-        }
-    }, [content, displayMode]);
-    return <span ref={ref} />;
-};
-
 // --- PDF Image Renderer ---
 const ImageViewer: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]; onEnlarge?: (image: ReferencedImage) => void; }> = ({ image, sourceFiles, onEnlarge }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -929,30 +915,35 @@ const ImageModal: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[];
 // --- Tutor Response View ---
 const TutorResponseView: React.FC<{ response: TutorResponse, sourceFiles: FileContent[] }> = ({ response, sourceFiles }) => {
     const [enlargedImage, setEnlargedImage] = useState<ReferencedImage | null>(null);
+    const answerRef = useRef<HTMLDivElement>(null);
 
-    const renderAnswer = useMemo(() => {
-        const parts = response.answer.split(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g);
-        return parts.map((part, index) => {
-            if (part.startsWith('$$') && part.endsWith('$$')) {
-                return (
-                    <div key={index} className="my-4 p-4 bg-gray-900/50 rounded-lg overflow-x-auto flex justify-center">
-                         <Equation content={part.slice(2, -2)} displayMode={true} />
-                    </div>
-                );
-            }
-            if (part.startsWith('$') && part.endsWith('$')) {
-                return <Equation key={index} content={part.slice(1, -1)} displayMode={false} />;
-            }
-            return <span key={index} dangerouslySetInnerHTML={{ __html: marked.parse(part) }} />;
-        });
+    // This effect will run after the component renders and the HTML is in the DOM.
+    // It will then scan the content for math and render it using the KaTeX auto-render extension.
+    useEffect(() => {
+        if (answerRef.current && (window as any).renderMathInElement) {
+            (window as any).renderMathInElement(answerRef.current, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                ],
+                throwOnError: false
+            });
+        }
+    }, [response.answer]);
+
+    const answerHtml = useMemo(() => {
+        if (!response.answer) return '';
+        return marked.parse(response.answer);
     }, [response.answer]);
     
     return (
         <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 shadow-lg mt-4">
             <div className="space-y-6">
-                <div className="prose prose-invert max-w-none prose-p:text-gray-300 prose-headings:text-gray-100">
-                    {renderAnswer}
-                </div>
+                <div
+                    ref={answerRef}
+                    className="prose prose-invert max-w-none prose-p:text-gray-300 prose-headings:text-gray-100"
+                    dangerouslySetInnerHTML={{ __html: answerHtml }}
+                />
                  {response.images && response.images.length > 0 && (
                     <div>
                         <h3 className="font-semibold text-lg text-gray-200 mb-2 mt-4">Referenced Images</h3>
