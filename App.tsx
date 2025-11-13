@@ -23,7 +23,7 @@ const USERS_STORE = 'usersStore';
 // FIX: Define an interface for dbService to resolve issues with 'this' type inference inside the object literal.
 interface IDBService {
     openDB(): Promise<IDBDatabase>;
-    dbRequest<T>(storeName: string, mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest<T>): Promise<T>;
+    dbRequest<T>(storeName: string, mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest | IDBRequest<T[]>): Promise<T>;
     getUser(email: string): Promise<User | undefined>;
     addUser(user: User): Promise<IDBValidKey>;
     getSubjectsByClass(className: string): Promise<SubjectData[]>;
@@ -56,51 +56,57 @@ const dbService: IDBService = {
             request.onerror = (event) => reject((event.target as IDBOpenDBRequest).error);
         });
     },
-    // FIX: Refactored to use async/await for better readability and to avoid potential issues with `this` context inference in complex promise chains.
-    async dbRequest<T>(storeName: string, mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+    // FIX: Refactored to be fully robust. It now waits for the transaction to complete before resolving, guaranteeing data is committed.
+    async dbRequest<T>(storeName: string, mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest | IDBRequest<T[]>): Promise<T> {
         const db = await this.openDB();
-        return new Promise((resolve, reject) => {
+        return new Promise<T>((resolve, reject) => {
             const transaction = db.transaction(storeName, mode);
             const store = transaction.objectStore(storeName);
             const request = action(store);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
+            
+            let result: T;
+
+            request.onsuccess = () => {
+                result = request.result;
+            };
+
+            request.onerror = () => {
+                reject(request.error);
+            };
+
+            transaction.oncomplete = () => {
+                resolve(result);
+            };
+
+            transaction.onerror = () => {
+                reject(transaction.error);
+            };
         });
     },
     getUser(email: string): Promise<User | undefined> {
-        // FIX: Cast `this` to `IDBService` to resolve TypeScript's inability to infer the type of `this` within an object literal, fixing the "Untyped function calls may not accept type arguments" error.
         return (this as IDBService).dbRequest<User | undefined>(USERS_STORE, 'readonly', store => store.get(email));
     },
     addUser(user: User): Promise<IDBValidKey> {
-        // FIX: Cast `this` to `IDBService` to resolve TypeScript's inability to infer the type of `this` within an object literal, fixing the "Untyped function calls may not accept type arguments" error.
         return (this as IDBService).dbRequest<IDBValidKey>(USERS_STORE, 'readwrite', store => store.put(user));
     },
-    // FIX: Refactored to use async/await for better readability and to avoid potential issues with `this` context inference in complex promise chains.
+    // FIX: Refactored to use the new robust `dbRequest` method for consistency and reliability.
     async getSubjectsByClass(className: string): Promise<SubjectData[]> {
-        const db = await this.openDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(SUBJECTS_STORE, 'readonly');
-            const store = transaction.objectStore(SUBJECTS_STORE);
+        const results = await (this as IDBService).dbRequest<SubjectData[]>(SUBJECTS_STORE, 'readonly', store => {
             const index = store.index('classIndex');
-            const request = index.getAll(className);
-            request.onsuccess = () => resolve(request.result || []);
-            request.onerror = (event) => reject((event.target as IDBRequest).error);
+            return index.getAll(className);
         });
+        return results || [];
     },
     getSubject(id: string): Promise<SubjectData | undefined> {
-        // FIX: Cast `this` to `IDBService` to resolve TypeScript's inability to infer the type of `this` within an object literal, fixing the "Untyped function calls may not accept type arguments" error.
         return (this as IDBService).dbRequest<SubjectData | undefined>(SUBJECTS_STORE, 'readonly', store => store.get(id));
     },
     saveSubject(subject: SubjectData): Promise<IDBValidKey> {
-        // FIX: Cast `this` to `IDBService` to resolve TypeScript's inability to infer the type of `this` within an object literal, fixing the "Untyped function calls may not accept type arguments" error.
         return (this as IDBService).dbRequest<IDBValidKey>(SUBJECTS_STORE, 'readwrite', store => store.put(subject));
     },
     getChapterDetails(id: string): Promise<ChapterDetails | undefined> {
-        // FIX: Cast `this` to `IDBService` to resolve TypeScript's inability to infer the type of `this` within an object literal, fixing the "Untyped function calls may not accept type arguments" error.
         return (this as IDBService).dbRequest<ChapterDetails | undefined>(CHAPTERS_STORE, 'readonly', store => store.get(id));
     },
     saveChapterDetails(details: ChapterDetails): Promise<IDBValidKey> {
-        // FIX: Cast `this` to `IDBService` to resolve TypeScript's inability to infer the type of `this` within an object literal, fixing the "Untyped function calls may not accept type arguments" error.
         return (this as IDBService).dbRequest<IDBValidKey>(CHAPTERS_STORE, 'readwrite', store => store.put(details));
     },
     clearDB(): Promise<void> {
@@ -111,7 +117,6 @@ const dbService: IDBService = {
         });
     },
     hasSubjects(): Promise<boolean> {
-        // FIX: Cast `this` to `IDBService` to resolve TypeScript's inability to infer the type of `this` within an object literal, fixing the "Untyped function calls may not accept type arguments" error.
         return (this as IDBService).dbRequest<number>(SUBJECTS_STORE, 'readonly', store => store.count()).then(count => count > 0);
     },
 };
@@ -321,19 +326,32 @@ const addFileNameToMindMapNode = (node: MindMapNode, fileName: string): void => 
 
 // --- Admin View ---
 const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: () => void; }> = ({ onCorpusUpdate, user, onLogout }) => {
+    const [subjects, setSubjects] = useState<SubjectData[]>([]);
+    const [isAddingSubject, setIsAddingSubject] = useState(false);
+    const [newSubjectName, setNewSubjectName] = useState('');
     const [files, setFiles] = useState<FileList | null>(null);
-    const [className, setClassName] = useState('');
-    const [subject, setSubject] = useState('');
-    const [isProcessing, setIsProcessing] = useState(false);
+
+    const [isLoading, setIsLoading] = useState(true);
+    const [isProcessing, setIsProcessing] = useState<string | null>(null); // Use string to track which subject is processing
     const [status, setStatus] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFiles(e.target.files);
-        setError('');
-        setSuccess('');
-    };
+    const loadSubjects = useCallback(async () => {
+        setIsLoading(true);
+        const subs = await dbService.getSubjectsByClass(user.className);
+        setSubjects(subs);
+        if (subs.length === 0) {
+            setIsAddingSubject(true); // If no subjects, default to add subject view
+        }
+        setIsLoading(false);
+    }, [user.className]);
+
+    useEffect(() => {
+        loadSubjects();
+    }, [loadSubjects]);
     
     const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -342,29 +360,26 @@ const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: ()
         reader.onerror = error => reject(error);
     });
 
-    const handleSave = async () => {
-        if (!files || files.length === 0 || !className || !subject) {
-            setError("Please provide a Class, Subject, and at least one PDF file (each PDF is one chapter).");
-            return;
-        }
-        setIsProcessing(true);
+    const processAndSave = async (filesToProcess: FileList, subjectName: string, existingSubject?: SubjectData) => {
+        setIsProcessing(existingSubject ? existingSubject.id : 'new');
         setError('');
         setSuccess('');
 
         try {
-            const subjectId = `${className}-${subject}`;
-            const existingSubject = await dbService.getSubject(subjectId);
+            const subjectId = `${user.className}-${subjectName}`;
             let subjectToUpdate: SubjectData;
 
             if (existingSubject) {
                 subjectToUpdate = existingSubject;
             } else {
+                const check = await dbService.getSubject(subjectId);
+                if (check) throw new Error(`Subject "${subjectName}" already exists.`);
                 subjectToUpdate = {
                     id: subjectId,
-                    className,
-                    subject,
+                    className: user.className,
+                    subject: subjectName,
                     files: [],
-                    structure: { id: "root", title: subject, children: [], startPage: 0, endPage: 0, fileName: 'subject' }
+                    structure: { id: "root", title: subjectName, children: [], startPage: 0, endPage: 0, fileName: 'subject' }
                 };
             }
 
@@ -372,8 +387,8 @@ const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: ()
             const newChapterMindMaps: MindMapNode[] = [];
             let newFilesAdded = 0;
 
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
+            for (let i = 0; i < filesToProcess.length; i++) {
+                const file = filesToProcess[i];
                 const chapterNumber = startChapterNumber + i + 1;
 
                 if (subjectToUpdate.files.some(f => f.fileName === file.name)) {
@@ -395,11 +410,9 @@ const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: ()
                 setStatus(`Generating details for Chapter ${chapterNumber}...`);
                 const details = await generateChapterDetails_Interactive(chapterFileContent, chapterNumber);
                 
-                // Recursively add the filename to every node in the mind map
                 addFileNameToMindMapNode(details.mindMap, file.name);
 
                 const chapterId = details.mindMap.id;
-
                 const chapterDetails: ChapterDetails = {
                     ...details,
                     id: `${subjectId}-${chapterId}`,
@@ -416,54 +429,105 @@ const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: ()
 
             if (newFilesAdded === 0) {
                 setSuccess("No new files to add. Subject is already up-to-date.");
-                setIsProcessing(false);
-                return;
+            } else {
+                 subjectToUpdate.structure.children.push(...newChapterMindMaps);
+                 await dbService.saveSubject(subjectToUpdate);
+                 setSuccess(`Successfully added ${newFilesAdded} new chapter(s) to "${subjectName}".`);
             }
-
-            subjectToUpdate.structure.children.push(...newChapterMindMaps);
-            await dbService.saveSubject(subjectToUpdate);
-
-            setSuccess(`Successfully added ${newFilesAdded} new chapter(s) to "${subject}".`);
+           
             setFiles(null);
-            const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-            if (fileInput) fileInput.value = '';
+            if(fileInputRef.current) fileInputRef.current.value = '';
+            await loadSubjects(); // Refresh the list
+            setIsAddingSubject(false);
+            setNewSubjectName('');
 
         } catch (err: any) {
             setError(err.message || "An unexpected error occurred.");
         } finally {
-            setIsProcessing(false);
+            setIsProcessing(null);
             setStatus('');
         }
+    };
+    
+    const handleAddNewSubject = () => {
+        if (!newSubjectName || !files || files.length === 0) {
+            setError("Please provide a subject name and at least one PDF chapter.");
+            return;
+        }
+        processAndSave(files, newSubjectName);
+    };
+
+    const handleAppendChapters = (subject: SubjectData, chapterFiles: FileList | null) => {
+        if (!chapterFiles || chapterFiles.length === 0) {
+            setError(`Please select PDF files to add to "${subject.subject}".`);
+            return;
+        }
+        processAndSave(chapterFiles, subject.subject, subject);
     };
     
     return (
         <div className="min-h-screen bg-gray-900 text-gray-200 p-8">
             <div className="max-w-4xl mx-auto">
                 <div className="flex justify-between items-center mb-4">
-                    <p className="text-gray-400">Welcome, {user.name} (Admin)</p>
-                    <button onClick={onLogout} className="text-gray-400 hover:underline">Logout</button>
-                </div>
-                <Header subtitle="Upload syllabus to build the knowledge base." />
-                <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 space-y-4">
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input type="text" value={className} onChange={(e) => setClassName(e.target.value)} placeholder="Class (e.g., Class 10)" className="bg-gray-700 border border-gray-600 rounded-lg p-3" />
-                        <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject (e.g., Physics)" className="bg-gray-700 border border-gray-600 rounded-lg p-3" />
+                    <p className="text-gray-400">Welcome, {user.name} (Admin for {user.className})</p>
+                     <div className="flex items-center gap-4">
+                        <button onClick={onCorpusUpdate} className="text-gray-300 hover:text-white">
+                           Go to Student Dashboard &rarr;
+                        </button>
+                        <button onClick={onLogout} className="text-gray-400 hover:underline">Logout</button>
                     </div>
-                    <label className="block w-full text-center cursor-pointer bg-gray-700 hover:bg-gray-600 py-3 px-5 rounded-lg border border-gray-600">
-                        <span>{files && files.length > 0 ? `${files.length} files selected` : 'Choose Chapters (.pdf, multiple allowed)'}</span>
-                        <input id="file-upload" type="file" onChange={handleFileChange} className="hidden" accept=".pdf" multiple />
-                    </label>
-                    <button onClick={handleSave} disabled={isProcessing} className="w-full bg-white text-black font-bold py-3 rounded-lg hover:bg-gray-300 disabled:bg-gray-500 disabled:cursor-not-allowed">
-                        {isProcessing ? 'Processing...' : 'Save Subject'}
-                    </button>
-                    {isProcessing && <div className="text-center text-gray-300 mt-2">{status}</div>}
-                    {error && <div className="text-red-400 bg-red-900/50 p-4 rounded-lg mt-4">{error}</div>}
-                    {success && <div className="text-green-400 bg-green-900/50 p-4 rounded-lg mt-4">{success}</div>}
                 </div>
-                <div className="text-center mt-6">
-                    <button onClick={onCorpusUpdate} className="text-gray-300 hover:text-white">
-                        Done Uploading, Go to Dashboard &rarr;
-                    </button>
+                <Header subtitle="Manage subjects and chapters for the syllabus." />
+
+                {error && <div className="text-red-400 bg-red-900/50 p-4 rounded-lg my-4">{error}</div>}
+                {success && <div className="text-green-400 bg-green-900/50 p-4 rounded-lg my-4">{success}</div>}
+                {isProcessing && <div className="text-center text-gray-300 my-2">{status || 'Processing...'}</div>}
+
+                {isAddingSubject ? (
+                    <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 space-y-4">
+                        <h2 className="text-xl font-bold">Add New Subject</h2>
+                        <input type="text" value={newSubjectName} onChange={(e) => setNewSubjectName(e.target.value)} placeholder="New Subject Name (e.g., Physics)" className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3" />
+                         <label className="block w-full text-center cursor-pointer bg-gray-700 hover:bg-gray-600 py-3 px-5 rounded-lg border border-gray-600">
+                            <span>{files && files.length > 0 ? `${files.length} chapter(s) selected` : 'Choose Chapters (.pdf)'}</span>
+                            <input ref={fileInputRef} type="file" onChange={(e) => setFiles(e.target.files)} className="hidden" accept=".pdf" multiple />
+                        </label>
+                        <div className="flex gap-4">
+                            <button onClick={handleAddNewSubject} disabled={!!isProcessing} className="flex-grow bg-white text-black font-bold py-3 rounded-lg hover:bg-gray-300 disabled:bg-gray-500">
+                                {isProcessing === 'new' ? 'Saving...' : 'Save New Subject'}
+                            </button>
+                             <button onClick={() => { setIsAddingSubject(false); setError(''); }} className="bg-gray-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-500">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-center">
+                        <button onClick={() => setIsAddingSubject(true)} className="bg-white text-black font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition">
+                            + Add New Subject
+                        </button>
+                    </div>
+                )}
+
+
+                <div className="mt-8 space-y-4">
+                    <h2 className="text-2xl font-semibold border-b border-gray-700 pb-2">Existing Subjects</h2>
+                    {isLoading ? <LoadingSpinner /> : subjects.length > 0 ? (
+                        subjects.map(sub => (
+                             <div key={sub.id} className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+                                <h3 className="text-xl font-bold">{sub.subject}</h3>
+                                <p className="text-sm text-gray-400 mb-4">{sub.files.length} chapter(s) uploaded.</p>
+                                <div className="flex gap-4 items-center">
+                                    <label className="flex-grow text-center cursor-pointer bg-gray-700 hover:bg-gray-600 py-2 px-4 rounded-lg border border-gray-600">
+                                        <span>Add Chapters...</span>
+                                        <input type="file" className="hidden" accept=".pdf" multiple onChange={(e) => handleAppendChapters(sub, e.target.files)} disabled={!!isProcessing} />
+                                    </label>
+                                    {isProcessing === sub.id && <LoadingSpinner inline />}
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        !isAddingSubject && <p className="text-center text-gray-400 py-8">No subjects created yet. Click "Add New Subject" to begin.</p>
+                    )}
                 </div>
             </div>
         </div>
@@ -483,13 +547,6 @@ const DashboardView: React.FC<{ user: User; onLogout: () => void; onSwitchToAdmi
             .finally(() => setIsLoading(false));
     }, [user.className]);
     
-    const handleReset = async () => {
-        if (window.confirm("Are you sure? This will delete all syllabus data.")) {
-            await dbService.clearDB();
-            onSwitchToAdmin();
-        }
-    };
-
     if (selectedSubject) {
         return <SubjectHomeView subject={selectedSubject} onBack={() => setSelectedSubject(null)} user={user} />;
     }
@@ -515,8 +572,8 @@ const DashboardView: React.FC<{ user: User; onLogout: () => void; onSwitchToAdmi
                      {subjects.length === 0 && !isLoading && <p className="text-center text-gray-400">No subjects found for your class. An administrator needs to upload them.</p>}
                 </div>
                 <div className="text-center mt-6">
-                    <button onClick={handleReset} className="text-gray-500 hover:text-red-400 text-sm">
-                        Admin Mode
+                    <button onClick={onSwitchToAdmin} className="text-gray-400 hover:text-white text-sm">
+                        Manage Syllabus
                     </button>
                 </div>
             </div>
@@ -670,7 +727,7 @@ const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onB
                             <div className="p-4 bg-gray-700/60 rounded-xl">
                                 <p className="font-semibold text-gray-200">{turn.query}</p>
                             </div>
-                            <TutorResponseView response={turn.response} sourceFiles={subject.files} />
+                            <TutorResponseView response={turn.response} subject={subject} />
                         </div>
                     ))}
                      
@@ -913,9 +970,23 @@ const ImageModal: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[];
 
 
 // --- Tutor Response View ---
-const TutorResponseView: React.FC<{ response: TutorResponse, sourceFiles: FileContent[] }> = ({ response, sourceFiles }) => {
+const TutorResponseView: React.FC<{ response: TutorResponse, subject: SubjectData }> = ({ response, subject }) => {
     const [enlargedImage, setEnlargedImage] = useState<ReferencedImage | null>(null);
     const answerRef = useRef<HTMLDivElement>(null);
+    const sourceFiles = subject.files;
+
+    const fileNameToChapterTitleMap = useMemo(() => {
+        const map = new Map<string, string>();
+        if (!subject?.structure?.children) {
+            return map;
+        }
+        for (const chapterRootNode of subject.structure.children) {
+            if (chapterRootNode.fileName && chapterRootNode.title) {
+                map.set(chapterRootNode.fileName, chapterRootNode.title);
+            }
+        }
+        return map;
+    }, [subject]);
 
     // This effect will run after the component renders and the HTML is in the DOM.
     // It will then scan the content for math and render it using the KaTeX auto-render extension.
@@ -958,11 +1029,14 @@ const TutorResponseView: React.FC<{ response: TutorResponse, sourceFiles: FileCo
                     <div>
                         <h3 className="font-semibold text-lg text-gray-200 mb-2 mt-4">References</h3>
                         <ul className="space-y-1 list-disc list-inside bg-gray-900/50 p-4 rounded-md">
-                            {response.citations.map((cite, index) => (
-                                <li key={index} className="text-sm text-gray-400">
-                                    <span className="font-medium text-gray-300">{cite.fileName}</span>, page {cite.page}
-                                </li>
-                            ))}
+                            {response.citations.map((cite, index) => {
+                                const chapterTitle = fileNameToChapterTitleMap.get(cite.fileName) || cite.fileName;
+                                return (
+                                    <li key={index} className="text-sm text-gray-400">
+                                        Chapter: <span className="font-medium text-gray-300">'{chapterTitle}'</span>, page {cite.page}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     </div>
                 )}
