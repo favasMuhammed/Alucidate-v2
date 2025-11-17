@@ -157,9 +157,9 @@ const extractPdfPages = async (sourceBase64: string, startPage: number, endPage:
 
 
 // --- Helper Components & Icons ---
-const LoadingSpinner: React.FC<{ fullScreen?: boolean; inline?: boolean; theme?: Theme }> = ({ fullScreen, inline, theme = 'dark' }) => (
+const LoadingSpinner: React.FC<{ fullScreen?: boolean; inline?: boolean }> = ({ fullScreen, inline }) => (
     <div className={`flex justify-center items-center ${fullScreen ? 'min-h-screen' : 'p-4'} ${inline ? 'h-full' : ''}`}>
-        <div className={`animate-spin rounded-full border-b-2 ${theme === 'dark' ? 'border-white' : 'border-black'} ${inline ? 'h-8 w-8' : 'h-16 w-16'}`}></div>
+        <div className={`animate-spin rounded-full border-b-2 border-gray-400 ${inline ? 'h-8 w-8' : 'h-16 w-16'}`}></div>
     </div>
 );
 const BackIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -167,153 +167,17 @@ const BackIcon: React.FC<{ className?: string }> = ({ className }) => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
     </svg>
 );
-const AlucidateLogo: React.FC<{ theme?: Theme }> = ({ theme = 'dark' }) => (
-    <h1 className={`text-4xl sm:text-5xl font-light ${theme === 'dark' ? 'text-white' : 'text-black'} tracking-wider`}>
-        <span className="font-semibold">AI</span>lucidate
+const AlucidateLogo: React.FC = () => (
+    <h1 className="text-4xl sm:text-5xl font-light text-gray-200 tracking-wider">
+        <span className="font-semibold text-white">AI</span>lucidate
     </h1>
 );
-const Header: React.FC<{ subtitle?: string; theme?: Theme }> = ({ subtitle, theme = 'dark' }) => (
+const Header: React.FC<{ subtitle?: string }> = ({ subtitle }) => (
     <header className="text-center mb-8">
-        <AlucidateLogo theme={theme} />
-        {subtitle && <p className={`mt-2 ${theme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>{subtitle}</p>}
+        <AlucidateLogo />
+        {subtitle && <p className="mt-2 text-gray-400">{subtitle}</p>}
     </header>
 );
-
-// --- Sidebar Icons ---
-const MenuIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-);
-
-const CloseIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-);
-
-const BookIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-    </svg>
-);
-
-// --- Subject Sidebar Component ---
-const SubjectSidebar: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    subjects: SubjectData[];
-    currentSubjectId: string | null;
-    onSelectSubject: (subject: SubjectData) => void;
-    user: User;
-    theme?: Theme;
-}> = ({ isOpen, onClose, subjects, currentSubjectId, onSelectSubject, user, theme = 'dark' }) => {
-    const isDark = theme === 'dark';
-    return (
-        <>
-            {/* Overlay */}
-            {isOpen && (
-                <div
-                    className={`fixed inset-0 ${isDark ? 'bg-black/50' : 'bg-white/50'} z-40 transition-opacity duration-300`}
-                    onClick={onClose}
-                />
-            )}
-            
-            {/* Sidebar */}
-            <div
-                className={`fixed top-0 right-0 h-full w-80 ${isDark ? 'bg-black border-white' : 'bg-white border-black'} border-l-2 z-50 transform transition-transform duration-300 ease-in-out ${
-                    isOpen ? 'translate-x-0' : 'translate-x-full'
-                } flex flex-col shadow-2xl`}
-            >
-                {/* Sidebar Header */}
-                <div className={`flex items-center justify-between p-4 border-b-2 ${isDark ? 'border-white bg-white/10' : 'border-black bg-black/10'}`}>
-                    <div className="flex items-center gap-2">
-                        <BookIcon className={`h-5 w-5 ${isDark ? 'text-white' : 'text-black'}`} />
-                        <h2 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-black'}`}>Subjects</h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className={`p-1 rounded-lg ${isDark ? 'hover:bg-white/20 text-white/70 hover:text-white' : 'hover:bg-black/20 text-black/70 hover:text-black'} transition`}
-                        aria-label="Close sidebar"
-                    >
-                        <CloseIcon className="h-5 w-5" />
-                    </button>
-                </div>
-
-                {/* Sidebar Content */}
-                <div className="flex-1 overflow-y-auto p-4">
-                    <div className="mb-4">
-                        <p className={`text-sm ${isDark ? 'text-white/70' : 'text-black/70'} mb-2`}>{user.className}</p>
-                        <p className={`text-xs ${isDark ? 'text-white/50' : 'text-black/50'}`}>{subjects.length} subject{subjects.length !== 1 ? 's' : ''} available</p>
-                    </div>
-                    
-                    {subjects.length === 0 ? (
-                        <div className="text-center py-8">
-                            <p className={isDark ? 'text-white/70' : 'text-black/70'}>No subjects available</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {subjects.map((subject) => (
-                                <button
-                                    key={subject.id}
-                                    onClick={() => {
-                                        onSelectSubject(subject);
-                                        onClose();
-                                    }}
-                                    className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                                        currentSubjectId === subject.id
-                                            ? isDark ? 'bg-white text-black border-white' : 'bg-black text-white border-black'
-                                            : isDark ? 'bg-white/10 border-white/50 text-white hover:bg-white/20 hover:border-white' : 'bg-black/10 border-black/50 text-black hover:bg-black/20 hover:border-black'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-medium">{subject.subject}</span>
-                                        {currentSubjectId === subject.id && (
-                                            <span className={`text-xs ${isDark ? 'bg-black/20' : 'bg-white/20'} px-2 py-0.5 rounded-full`}>Current</span>
-                                        )}
-                                    </div>
-                                    <p className={`text-xs ${isDark ? 'text-white/70' : 'text-black/70'} mt-1`}>
-                                        {subject.files.length} chapter{subject.files.length !== 1 ? 's' : ''}
-                                    </p>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Sidebar Footer */}
-                <div className={`p-4 border-t-2 ${isDark ? 'border-white bg-white/10' : 'border-black bg-black/10'}`}>
-                    <p className={`text-xs ${isDark ? 'text-white/50' : 'text-black/50'} text-center`}>
-                        Switch between subjects quickly
-                    </p>
-                </div>
-            </div>
-        </>
-    );
-};
-
-// --- Theme System ---
-type Theme = 'light' | 'dark';
-
-const ThemeToggle: React.FC<{ theme: Theme; onToggle: () => void }> = ({ theme, onToggle }) => {
-    return (
-        <button
-            onClick={onToggle}
-            className={`fixed top-4 right-20 z-50 p-3 ${theme === 'dark' ? 'bg-black border-2 border-white text-white hover:bg-white hover:text-black' : 'bg-white border-2 border-black text-black hover:bg-black hover:text-white'} rounded-lg transition-all shadow-lg`}
-            aria-label="Toggle theme"
-        >
-            {theme === 'dark' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-            ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-            )}
-        </button>
-    );
-};
 
 // --- Main App Component (Router) ---
 type AppState = 'loading' | 'auth' | 'admin' | 'dashboard';
@@ -321,20 +185,6 @@ type AppState = 'loading' | 'auth' | 'admin' | 'dashboard';
 export default function App() {
     const [appState, setAppState] = useState<AppState>('loading');
     const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [theme, setTheme] = useState<Theme>(() => {
-        const saved = localStorage.getItem('theme') as Theme;
-        return saved || 'dark';
-    });
-
-    useEffect(() => {
-        localStorage.setItem('theme', theme);
-        document.documentElement.classList.toggle('light', theme === 'light');
-        document.documentElement.classList.toggle('dark', theme === 'dark');
-    }, [theme]);
-
-    const toggleTheme = () => {
-        setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-    };
 
     const checkAuthStatus = useCallback(async () => {
         setAppState('loading');
@@ -385,24 +235,17 @@ export default function App() {
         checkAuthStatus();
     };
 
-    return (
-        <div className={theme === 'dark' ? 'bg-black text-white min-h-screen' : 'bg-white text-black min-h-screen'}>
-            <ThemeToggle theme={theme} onToggle={toggleTheme} />
-            {(() => {
-                switch (appState) {
-                    case 'loading': return <LoadingSpinner fullScreen theme={theme} />;
-                    case 'auth': return <AuthView onLogin={handleLogin} theme={theme} />;
-                    case 'admin': return <AdminView onCorpusUpdate={() => setAppState('dashboard')} user={currentUser!} onLogout={handleLogout} theme={theme} />;
-                    case 'dashboard': return <DashboardView user={currentUser!} onLogout={handleLogout} onSwitchToAdmin={() => setAppState('admin')} theme={theme} />;
-                    default: return <div className={theme === 'dark' ? 'text-white' : 'text-black'}>Error: Invalid application state.</div>;
-                }
-            })()}
-        </div>
-    );
+    switch (appState) {
+        case 'loading': return <LoadingSpinner fullScreen />;
+        case 'auth': return <AuthView onLogin={handleLogin} />;
+        case 'admin': return <AdminView onCorpusUpdate={() => setAppState('dashboard')} user={currentUser!} onLogout={handleLogout}/>;
+        case 'dashboard': return <DashboardView user={currentUser!} onLogout={handleLogout} onSwitchToAdmin={() => setAppState('admin')} />;
+        default: return <div>Error: Invalid application state.</div>;
+    }
 }
 
 // --- Authentication View ---
-const AuthView: React.FC<{ onLogin: (user: User) => void; theme: Theme }> = ({ onLogin, theme }) => {
+const AuthView: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) => {
     const [isLogin, setIsLogin] = useState(true);
     const [loginEmail, setLoginEmail] = useState('');
     const [loginError, setLoginError] = useState('');
@@ -439,30 +282,29 @@ const AuthView: React.FC<{ onLogin: (user: User) => void; theme: Theme }> = ({ o
         onLogin(newUser);
     };
 
-    const isDark = theme === 'dark';
     return (
-        <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? 'bg-black' : 'bg-white'}`}>
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gray-900">
             <div className="max-w-md w-full">
-                <Header subtitle={isLogin ? "Welcome back! Please log in." : "Create your student account."} theme={theme} />
-                <div className={`${isDark ? 'bg-white/10 border-white' : 'bg-black/10 border-black'} p-8 rounded-xl border-2 shadow-lg`}>
+                <Header subtitle={isLogin ? "Welcome back! Please log in." : "Create your student account."} />
+                <div className="bg-gray-800/50 p-8 rounded-xl border border-gray-700 shadow-lg">
                     {isLogin ? (
                         <form onSubmit={handleLogin} className="space-y-6">
-                            <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="Email Address" required className={`w-full ${isDark ? 'bg-white/10 border-white text-white placeholder-white/50' : 'bg-black/10 border-black text-black placeholder-black/50'} border-2 rounded-lg p-3 focus:outline-none focus:ring-2 ${isDark ? 'focus:ring-white' : 'focus:ring-black'}`} />
-                            {loginError && <p className={`${isDark ? 'text-white border-white' : 'text-black border-black'} text-sm border-2 p-2 rounded`}>{loginError}</p>}
-                            <button type="submit" className={`w-full ${isDark ? 'bg-white text-black hover:bg-white/90' : 'bg-black text-white hover:bg-black/90'} font-bold py-3 px-6 rounded-lg transition`}>Log In</button>
+                            <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="Email Address" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-gray-400 focus:outline-none" />
+                            {loginError && <p className="text-red-400 text-sm">{loginError}</p>}
+                            <button type="submit" className="w-full bg-white text-black font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition">Log In</button>
                         </form>
                     ) : (
                          <form onSubmit={handleSignup} className="space-y-4">
-                            <input type="text" value={signupName} onChange={e => setSignupName(e.target.value)} placeholder="Full Name" required className={`w-full ${isDark ? 'bg-white/10 border-white text-white placeholder-white/50' : 'bg-black/10 border-black text-black placeholder-black/50'} border-2 rounded-lg p-3 focus:outline-none focus:ring-2 ${isDark ? 'focus:ring-white' : 'focus:ring-black'}`} />
-                            <input type="text" value={signupClass} onChange={e => setSignupClass(e.target.value)} placeholder="Class (e.g., Class 10)" required className={`w-full ${isDark ? 'bg-white/10 border-white text-white placeholder-white/50' : 'bg-black/10 border-black text-black placeholder-black/50'} border-2 rounded-lg p-3 focus:outline-none focus:ring-2 ${isDark ? 'focus:ring-white' : 'focus:ring-black'}`} />
-                            <input type="email" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} placeholder="Email Address" required className={`w-full ${isDark ? 'bg-white/10 border-white text-white placeholder-white/50' : 'bg-black/10 border-black text-black placeholder-black/50'} border-2 rounded-lg p-3 focus:outline-none focus:ring-2 ${isDark ? 'focus:ring-white' : 'focus:ring-black'}`} />
-                            {signupError && <p className={`${isDark ? 'text-white border-white' : 'text-black border-black'} text-sm border-2 p-2 rounded`}>{signupError}</p>}
-                            <button type="submit" className={`w-full ${isDark ? 'bg-white text-black hover:bg-white/90' : 'bg-black text-white hover:bg-black/90'} font-bold py-3 px-6 rounded-lg transition`}>Sign Up</button>
+                            <input type="text" value={signupName} onChange={e => setSignupName(e.target.value)} placeholder="Full Name" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-gray-400 focus:outline-none" />
+                            <input type="text" value={signupClass} onChange={e => setSignupClass(e.target.value)} placeholder="Class (e.g., Class 10)" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-gray-400 focus:outline-none" />
+                            <input type="email" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} placeholder="Email Address" required className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-gray-400 focus:outline-none" />
+                            {signupError && <p className="text-red-400 text-sm">{signupError}</p>}
+                            <button type="submit" className="w-full bg-white text-black font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition">Sign Up</button>
                         </form>
                     )}
-                    <p className={`text-center text-sm ${isDark ? 'text-white/70' : 'text-black/70'} mt-6`}>
+                    <p className="text-center text-sm text-gray-400 mt-6">
                         {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
-                        <button onClick={() => setIsLogin(!isLogin)} className={`font-medium ${isDark ? 'text-white hover:underline' : 'text-black hover:underline'}`}>
+                        <button onClick={() => setIsLogin(!isLogin)} className="font-medium text-gray-300 hover:underline hover:text-white">
                             {isLogin ? 'Sign Up' : 'Log In'}
                         </button>
                     </p>
@@ -483,7 +325,7 @@ const addFileNameToMindMapNode = (node: MindMapNode, fileName: string): void => 
 };
 
 // --- Admin View ---
-const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: () => void; theme: Theme }> = ({ onCorpusUpdate, user, onLogout, theme }) => {
+const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: () => void; }> = ({ onCorpusUpdate, user, onLogout }) => {
     const [subjects, setSubjects] = useState<SubjectData[]>([]);
     const [isAddingSubject, setIsAddingSubject] = useState(false);
     const [newSubjectName, setNewSubjectName] = useState('');
@@ -623,45 +465,44 @@ const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: ()
         processAndSave(chapterFiles, subject.subject, subject);
     };
     
-    const isDark = theme === 'dark';
     return (
-        <div className={`min-h-screen ${isDark ? 'bg-black text-white' : 'bg-white text-black'} p-8`}>
+        <div className="min-h-screen bg-gray-900 text-gray-200 p-8">
             <div className="max-w-4xl mx-auto">
                 <div className="flex justify-between items-center mb-4">
-                    <p className={isDark ? 'text-white/70' : 'text-black/70'}>Welcome, {user.name} (Admin for {user.className})</p>
+                    <p className="text-gray-400">Welcome, {user.name} (Admin for {user.className})</p>
                      <div className="flex items-center gap-4">
-                        <button onClick={onCorpusUpdate} className={isDark ? 'text-white hover:underline' : 'text-black hover:underline'}>
+                        <button onClick={onCorpusUpdate} className="text-gray-300 hover:text-white">
                            Go to Student Dashboard &rarr;
                         </button>
-                        <button onClick={onLogout} className={isDark ? 'text-white/70 hover:underline hover:text-white' : 'text-black/70 hover:underline hover:text-black'}>Logout</button>
+                        <button onClick={onLogout} className="text-gray-400 hover:underline">Logout</button>
                     </div>
                 </div>
-                <Header subtitle="Manage subjects and chapters for the syllabus." theme={theme} />
+                <Header subtitle="Manage subjects and chapters for the syllabus." />
 
-                {error && <div className={`${isDark ? 'text-white bg-white/10 border-white' : 'text-black bg-black/10 border-black'} p-4 rounded-lg my-4 border-2`}>{error}</div>}
-                {success && <div className={`${isDark ? 'text-white bg-white/10 border-white' : 'text-black bg-black/10 border-black'} p-4 rounded-lg my-4 border-2`}>{success}</div>}
-                {isProcessing && <div className={`text-center ${isDark ? 'text-white' : 'text-black'} my-2`}>{status || 'Processing...'}</div>}
+                {error && <div className="text-red-400 bg-red-900/50 p-4 rounded-lg my-4">{error}</div>}
+                {success && <div className="text-green-400 bg-green-900/50 p-4 rounded-lg my-4">{success}</div>}
+                {isProcessing && <div className="text-center text-gray-300 my-2">{status || 'Processing...'}</div>}
 
                 {isAddingSubject ? (
-                    <div className={`${isDark ? 'bg-white/10 border-white' : 'bg-black/10 border-black'} p-6 rounded-xl border-2 space-y-4`}>
+                    <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 space-y-4">
                         <h2 className="text-xl font-bold">Add New Subject</h2>
-                        <input type="text" value={newSubjectName} onChange={(e) => setNewSubjectName(e.target.value)} placeholder="New Subject Name (e.g., Physics)" className={`w-full ${isDark ? 'bg-white/10 border-white text-white placeholder-white/50' : 'bg-black/10 border-black text-black placeholder-black/50'} border-2 rounded-lg p-3`} />
-                         <label className={`block w-full text-center cursor-pointer ${isDark ? 'bg-white/10 hover:bg-white/20 border-white' : 'bg-black/10 hover:bg-black/20 border-black'} py-3 px-5 rounded-lg border-2`}>
+                        <input type="text" value={newSubjectName} onChange={(e) => setNewSubjectName(e.target.value)} placeholder="New Subject Name (e.g., Physics)" className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3" />
+                         <label className="block w-full text-center cursor-pointer bg-gray-700 hover:bg-gray-600 py-3 px-5 rounded-lg border border-gray-600">
                             <span>{files && files.length > 0 ? `${files.length} chapter(s) selected` : 'Choose Chapters (.pdf)'}</span>
                             <input ref={fileInputRef} type="file" onChange={(e) => setFiles(e.target.files)} className="hidden" accept=".pdf" multiple />
                         </label>
                         <div className="flex gap-4">
-                            <button onClick={handleAddNewSubject} disabled={!!isProcessing} className={`flex-grow ${isDark ? 'bg-white text-black hover:bg-white/90 disabled:bg-white/50' : 'bg-black text-white hover:bg-black/90 disabled:bg-black/50'} font-bold py-3 rounded-lg transition`}>
+                            <button onClick={handleAddNewSubject} disabled={!!isProcessing} className="flex-grow bg-white text-black font-bold py-3 rounded-lg hover:bg-gray-300 disabled:bg-gray-500">
                                 {isProcessing === 'new' ? 'Saving...' : 'Save New Subject'}
                             </button>
-                             <button onClick={() => { setIsAddingSubject(false); setError(''); }} className={`${isDark ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-black/20 text-black hover:bg-black/30'} font-bold py-3 px-6 rounded-lg transition`}>
+                             <button onClick={() => { setIsAddingSubject(false); setError(''); }} className="bg-gray-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-500">
                                 Cancel
                             </button>
                         </div>
                     </div>
                 ) : (
                     <div className="text-center">
-                        <button onClick={() => setIsAddingSubject(true)} className={`${isDark ? 'bg-white text-black hover:bg-white/90' : 'bg-black text-white hover:bg-black/90'} font-bold py-3 px-6 rounded-lg transition`}>
+                        <button onClick={() => setIsAddingSubject(true)} className="bg-white text-black font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition">
                             + Add New Subject
                         </button>
                     </div>
@@ -669,23 +510,23 @@ const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: ()
 
 
                 <div className="mt-8 space-y-4">
-                    <h2 className={`text-2xl font-semibold border-b-2 ${isDark ? 'border-white' : 'border-black'} pb-2`}>Existing Subjects</h2>
-                    {isLoading ? <LoadingSpinner theme={theme} /> : subjects.length > 0 ? (
+                    <h2 className="text-2xl font-semibold border-b border-gray-700 pb-2">Existing Subjects</h2>
+                    {isLoading ? <LoadingSpinner /> : subjects.length > 0 ? (
                         subjects.map(sub => (
-                             <div key={sub.id} className={`${isDark ? 'bg-white/10 border-white' : 'bg-black/10 border-black'} p-4 rounded-xl border-2`}>
+                             <div key={sub.id} className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
                                 <h3 className="text-xl font-bold">{sub.subject}</h3>
-                                <p className={`text-sm ${isDark ? 'text-white/70' : 'text-black/70'} mb-4`}>{sub.files.length} chapter(s) uploaded.</p>
+                                <p className="text-sm text-gray-400 mb-4">{sub.files.length} chapter(s) uploaded.</p>
                                 <div className="flex gap-4 items-center">
-                                    <label className={`flex-grow text-center cursor-pointer ${isDark ? 'bg-white/10 hover:bg-white/20 border-white' : 'bg-black/10 hover:bg-black/20 border-black'} py-2 px-4 rounded-lg border-2`}>
+                                    <label className="flex-grow text-center cursor-pointer bg-gray-700 hover:bg-gray-600 py-2 px-4 rounded-lg border border-gray-600">
                                         <span>Add Chapters...</span>
                                         <input type="file" className="hidden" accept=".pdf" multiple onChange={(e) => handleAppendChapters(sub, e.target.files)} disabled={!!isProcessing} />
                                     </label>
-                                    {isProcessing === sub.id && <LoadingSpinner inline theme={theme} />}
+                                    {isProcessing === sub.id && <LoadingSpinner inline />}
                                 </div>
                             </div>
                         ))
                     ) : (
-                        !isAddingSubject && <p className={`text-center ${isDark ? 'text-white/70' : 'text-black/70'} py-8`}>No subjects created yet. Click "Add New Subject" to begin.</p>
+                        !isAddingSubject && <p className="text-center text-gray-400 py-8">No subjects created yet. Click "Add New Subject" to begin.</p>
                     )}
                 </div>
             </div>
@@ -694,7 +535,7 @@ const AdminView: React.FC<{ onCorpusUpdate: () => void; user: User; onLogout: ()
 };
 
 // --- Student Dashboard View ---
-const DashboardView: React.FC<{ user: User; onLogout: () => void; onSwitchToAdmin: () => void; theme: Theme }> = ({ user, onLogout, onSwitchToAdmin, theme }) => {
+const DashboardView: React.FC<{ user: User; onLogout: () => void; onSwitchToAdmin: () => void; }> = ({ user, onLogout, onSwitchToAdmin }) => {
     const [subjects, setSubjects] = useState<SubjectData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedSubject, setSelectedSubject] = useState<SubjectData | null>(null);
@@ -706,33 +547,32 @@ const DashboardView: React.FC<{ user: User; onLogout: () => void; onSwitchToAdmi
             .finally(() => setIsLoading(false));
     }, [user.className]);
     
-    const isDark = theme === 'dark';
     if (selectedSubject) {
-        return <SubjectHomeView subject={selectedSubject} onBack={() => setSelectedSubject(null)} user={user} allSubjects={subjects} onSubjectChange={(newSubject) => setSelectedSubject(newSubject)} theme={theme} />;
+        return <SubjectHomeView subject={selectedSubject} onBack={() => setSelectedSubject(null)} user={user} />;
     }
 
     return (
-        <div className={`min-h-screen ${isDark ? 'bg-black text-white' : 'bg-white text-black'} p-8`}>
+        <div className="min-h-screen bg-gray-900 text-gray-200 p-8">
             <div className="max-w-4xl mx-auto">
                  <div className="flex justify-between items-center mb-4">
-                    <p className={isDark ? 'text-white/70' : 'text-black/70'}>Welcome, {user.name} ({user.className})</p>
-                    <button onClick={onLogout} className={isDark ? 'text-white/70 hover:underline hover:text-white' : 'text-black/70 hover:underline hover:text-black'}>Logout</button>
+                    <p className="text-gray-400">Welcome, {user.name} ({user.className})</p>
+                    <button onClick={onLogout} className="text-gray-400 hover:underline">Logout</button>
                 </div>
-                <Header subtitle="Select a subject to begin your study session." theme={theme} />
-                <div className={`${isDark ? 'bg-white/10 border-white' : 'bg-black/10 border-black'} p-6 rounded-xl border-2`}>
-                    {isLoading ? <LoadingSpinner theme={theme} /> : (
+                <Header subtitle="Select a subject to begin your study session." />
+                <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700">
+                    {isLoading ? <LoadingSpinner /> : (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             {subjects.map(sub => (
-                                <button key={sub.id} onClick={() => setSelectedSubject(sub)} className={`text-center ${isDark ? 'bg-white/10 hover:bg-white/20 border-white' : 'bg-black/10 hover:bg-black/20 border-black'} p-4 rounded-lg border-2 transition-all`}>
+                                <button key={sub.id} onClick={() => setSelectedSubject(sub)} className="text-center bg-gray-700/50 p-4 rounded-lg border border-gray-600 hover:bg-gray-700 hover:border-gray-500 transition-all">
                                     {sub.subject}
                                 </button>
                             ))}
                         </div>
                     )}
-                     {subjects.length === 0 && !isLoading && <p className={`text-center ${isDark ? 'text-white/70' : 'text-black/70'}`}>No subjects found for your class. An administrator needs to upload them.</p>}
+                     {subjects.length === 0 && !isLoading && <p className="text-center text-gray-400">No subjects found for your class. An administrator needs to upload them.</p>}
                 </div>
                 <div className="text-center mt-6">
-                    <button onClick={onSwitchToAdmin} className={`text-sm ${isDark ? 'text-white/70 hover:text-white' : 'text-black/70 hover:text-black'}`}>
+                    <button onClick={onSwitchToAdmin} className="text-gray-400 hover:text-white text-sm">
                         Manage Syllabus
                     </button>
                 </div>
@@ -742,12 +582,10 @@ const DashboardView: React.FC<{ user: User; onLogout: () => void; onSwitchToAdmi
 };
 
 // --- Subject Home / Chapter List View ---
-const SubjectHomeView: React.FC<{ subject: SubjectData; onBack: () => void; user: User; allSubjects?: SubjectData[]; onSubjectChange?: (subject: SubjectData) => void; theme: Theme }> = ({ subject, onBack, user, allSubjects, onSubjectChange, theme }) => {
+const SubjectHomeView: React.FC<{ subject: SubjectData; onBack: () => void; user: User; }> = ({ subject, onBack, user }) => {
     const [chapters, setChapters] = useState<ChapterDetails[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedChapter, setSelectedChapter] = useState<ChapterDetails | null>(null);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [allSubjectsList, setAllSubjectsList] = useState<SubjectData[]>(allSubjects || []);
 
     useEffect(() => {
         const loadChapters = async () => {
@@ -773,54 +611,30 @@ const SubjectHomeView: React.FC<{ subject: SubjectData; onBack: () => void; user
         };
         loadChapters();
     }, [subject.id]);
-
-    useEffect(() => {
-        if (allSubjects && allSubjects.length > 0) {
-            setAllSubjectsList(allSubjects);
-        } else {
-            dbService.getSubjectsByClass(user.className)
-                .then(setAllSubjectsList)
-                .catch(console.error);
-        }
-    }, [user.className, allSubjects]);
     
-    const isDark = theme === 'dark';
     if (selectedChapter) {
-        return <ChapterView chapter={selectedChapter} subject={subject} onBack={() => setSelectedChapter(null)} allSubjects={allSubjectsList} onSubjectChange={onSubjectChange} user={user} theme={theme} />;
+        return <ChapterView chapter={selectedChapter} subject={subject} onBack={() => setSelectedChapter(null)} />;
     }
 
-    const handleSubjectChange = (newSubject: SubjectData) => {
-        if (onSubjectChange) {
-            onSubjectChange(newSubject);
-        }
-    };
-
     return (
-         <div className={`min-h-screen ${isDark ? 'bg-black text-white' : 'bg-white text-black'} p-8 relative`}>
-            <button
-                onClick={() => setIsSidebarOpen(true)}
-                className={`fixed top-4 right-4 z-30 p-3 ${isDark ? 'bg-white/10 hover:bg-white/20 border-white text-white' : 'bg-black/10 hover:bg-black/20 border-black text-black'} border-2 rounded-lg transition shadow-lg`}
-                aria-label="Open subjects sidebar"
-            >
-                <MenuIcon className="h-5 w-5" />
-            </button>
+         <div className="min-h-screen bg-gray-900 text-gray-200 p-8">
             <div className="max-w-4xl mx-auto">
                 <header className="mb-8 relative">
-                    <button onClick={onBack} className={`absolute left-0 top-1/2 -translate-y-1/2 flex items-center ${isDark ? 'text-white hover:text-white/80' : 'text-black hover:text-black/80'}`}>
+                    <button onClick={onBack} className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center text-gray-300 hover:text-white">
                         <BackIcon className="h-5 w-5 mr-1"/> Back
                     </button>
                     <div className="text-center">
-                        <h1 className="text-4xl sm:text-5xl font-bold">{subject.subject}</h1>
-                        <p className={`mt-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>{user.className}</p>
+                        <h1 className="text-4xl sm:text-5xl font-bold text-gray-100">{subject.subject}</h1>
+                        <p className="mt-2 text-gray-400">{user.className}</p>
                     </div>
                 </header>
-                 <div className={`${isDark ? 'bg-white/10 border-white' : 'bg-black/10 border-black'} p-6 rounded-xl border-2`}>
-                    <h2 className="text-xl font-semibold mb-4">Chapters</h2>
-                     {isLoading ? <LoadingSpinner theme={theme} /> : (
+                 <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700">
+                    <h2 className="text-xl font-semibold text-gray-200 mb-4">Chapters</h2>
+                     {isLoading ? <LoadingSpinner /> : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {chapters.map(chapter => (
-                                <button key={chapter.id} onClick={() => setSelectedChapter(chapter)} className={`text-left p-4 ${isDark ? 'bg-white/10 hover:bg-white/20 border-white' : 'bg-black/10 hover:bg-black/20 border-black'} rounded-lg border-2 transition-all`}>
-                                    <span className={`font-mono text-xs ${isDark ? 'text-white/70' : 'text-black/70'}`}>Chapter {chapter.chapterId}</span>
+                                <button key={chapter.id} onClick={() => setSelectedChapter(chapter)} className="text-left p-4 bg-gray-700/50 rounded-lg border border-gray-600 hover:bg-gray-700 hover:border-gray-500 transition-all">
+                                    <span className="font-mono text-xs text-gray-400">Chapter {chapter.chapterId}</span>
                                     <h3 className="font-semibold mt-1">{chapter.chapterTitle}</h3>
                                 </button>
                             ))}
@@ -828,56 +642,22 @@ const SubjectHomeView: React.FC<{ subject: SubjectData; onBack: () => void; user
                      )}
                 </div>
             </div>
-            <SubjectSidebar
-                isOpen={isSidebarOpen}
-                onClose={() => setIsSidebarOpen(false)}
-                subjects={allSubjectsList}
-                currentSubjectId={subject.id}
-                onSelectSubject={handleSubjectChange}
-                user={user}
-                theme={theme}
-            />
         </div>
     );
 };
 
 
 // --- Chapter Detail View ---
-const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onBack: () => void; allSubjects?: SubjectData[]; onSubjectChange?: (subject: SubjectData) => void; user?: User; theme: Theme }> = ({ chapter, subject, onBack, allSubjects, onSubjectChange, user, theme }) => {
+const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onBack: () => void; }> = ({ chapter, subject, onBack }) => {
     const [conversation, setConversation] = useState<ConversationTurn[]>([]);
     const [isAnswering, setIsAnswering] = useState(false);
     const [query, setQuery] = useState('');
     const [error, setError] = useState('');
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [allSubjectsList, setAllSubjectsList] = useState<SubjectData[]>(allSubjects || []);
-    const [currentUser, setCurrentUser] = useState<User | null>(user || null);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [conversation, isAnswering]);
-
-    useEffect(() => {
-        if (allSubjects && allSubjects.length > 0) {
-            setAllSubjectsList(allSubjects);
-        } else if (!user) {
-            const userEmail = localStorage.getItem('currentUserEmail');
-            if (userEmail) {
-                dbService.getUser(userEmail).then(loadedUser => {
-                    if (loadedUser) {
-                        setCurrentUser(loadedUser);
-                        dbService.getSubjectsByClass(loadedUser.className)
-                            .then(setAllSubjectsList)
-                            .catch(console.error);
-                    }
-                });
-            }
-        } else {
-            dbService.getSubjectsByClass(user.className)
-                .then(setAllSubjectsList)
-                .catch(console.error);
-        }
-    }, [allSubjects, user]);
 
     const findChapterNode = (structure: MindMapNode, chapterId: string): MindMapNode | null => {
         return structure.children.find(chap => chap.id === chapterId) || null;
@@ -919,111 +699,85 @@ const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onB
         }
     };
 
-    const handleSubjectChange = (newSubject: SubjectData) => {
-        if (onSubjectChange) {
-            onSubjectChange(newSubject);
-        }
-    };
-
-    const isDark = theme === 'dark';
     return (
-        <div className={`h-screen ${isDark ? 'bg-black text-white' : 'bg-white text-black'} flex flex-col p-4 sm:p-6 lg:p-8 relative`}>
-            <button
-                onClick={() => setIsSidebarOpen(true)}
-                className={`fixed top-4 right-4 z-30 p-3 ${isDark ? 'bg-white/10 hover:bg-white/20 border-white text-white' : 'bg-black/10 hover:bg-black/20 border-black text-black'} border-2 rounded-lg transition shadow-lg`}
-                aria-label="Open subjects sidebar"
-            >
-                <MenuIcon className="h-5 w-5" />
-            </button>
+        <div className="h-screen bg-gray-900 text-gray-200 flex flex-col p-4 sm:p-6 lg:p-8">
             <div className="max-w-4xl mx-auto w-full flex flex-col flex-grow min-h-0">
                 <header className="mb-4 relative flex-shrink-0">
-                    <button onClick={onBack} className={`absolute left-0 top-1/2 -translate-y-1/2 flex items-center ${isDark ? 'text-white hover:text-white/80' : 'text-black hover:text-black/80'}`}>
+                    <button onClick={onBack} className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center text-gray-300 hover:text-white">
                         <BackIcon className="h-5 w-5 mr-1"/> Back to Chapters
                     </button>
                     <div className="text-center">
-                        <h1 className="text-3xl font-bold">{chapter.chapterTitle}</h1>
-                        <p className={`mt-1 ${isDark ? 'text-white/70' : 'text-black/70'}`}>Chapter {chapter.chapterId} - {subject.subject}</p>
+                        <h1 className="text-3xl font-bold text-gray-100">{chapter.chapterTitle}</h1>
+                        <p className="mt-1 text-gray-400">Chapter {chapter.chapterId} - {subject.subject}</p>
                     </div>
                 </header>
 
-                <main className={`flex-grow space-y-4 overflow-y-auto mb-4 pr-2 ${isDark ? 'scrollbar-thumb-white/20 scrollbar-track-black' : 'scrollbar-thumb-black/20 scrollbar-track-white'} scrollbar-thin`}>
-                    <div className={`${isDark ? 'bg-white/10 border-white' : 'bg-black/10 border-black'} p-6 rounded-xl border-2 space-y-6`}>
+                <main className="flex-grow space-y-4 overflow-y-auto mb-4 pr-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
+                    <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 space-y-6">
                         <div>
-                            <h3 className="font-semibold text-lg mb-2">Summary</h3>
-                            <p>{chapter.summary}</p>
+                            <h3 className="font-semibold text-lg text-gray-200 mb-2">Summary</h3>
+                            <p className="text-gray-300">{chapter.summary}</p>
                         </div>
-                        <KeywordsDisplay keywords={chapter.keywords} theme={theme} />
-                        <InteractiveMindMapView mindMap={chapter.mindMap} onAskQuestion={handleAskFromFlowchart} theme={theme} />
+                        <KeywordsDisplay keywords={chapter.keywords} />
+                        <InteractiveMindMapView mindMap={chapter.mindMap} onAskQuestion={handleAskFromFlowchart} />
                     </div>
 
                     {conversation.map((turn, index) => (
                         <div key={index} className="space-y-2">
-                            <div className={`p-4 ${isDark ? 'bg-white/10' : 'bg-black/10'} rounded-xl`}>
-                                <p className="font-semibold">{turn.query}</p>
+                            <div className="p-4 bg-gray-700/60 rounded-xl">
+                                <p className="font-semibold text-gray-200">{turn.query}</p>
                             </div>
-                            <TutorResponseView response={turn.response} subject={subject} theme={theme} />
+                            <TutorResponseView response={turn.response} subject={subject} />
                         </div>
                     ))}
                      
-                    {isAnswering && <LoadingSpinner inline theme={theme} />}
-                    {error && <div className={`${isDark ? 'text-white bg-white/10 border-white' : 'text-black bg-black/10 border-black'} p-4 rounded-lg border-2`}>{error}</div>}
+                    {isAnswering && <LoadingSpinner inline />}
+                    {error && <div className="text-red-400 bg-red-900/50 p-4 rounded-lg">{error}</div>}
                     <div ref={chatEndRef} />
                 </main>
 
-                <footer className={`flex-shrink-0 sticky bottom-0 py-2 ${isDark ? 'bg-black' : 'bg-white'}`}>
-                    <div className={`${isDark ? 'bg-white/10 border-white' : 'bg-black/10 border-black'} p-4 rounded-xl border-2`}>
+                <footer className="flex-shrink-0 sticky bottom-0 py-2 bg-gray-900">
+                    <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
                         <div className="flex gap-4">
                             <input
                                 id="chat-input"
                                 type="text" value={query} onChange={(e) => setQuery(e.target.value)}
                                 placeholder={`Ask about "${chapter.chapterTitle}"...`}
-                                className={`flex-grow ${isDark ? 'bg-white/10 border-white text-white placeholder-white/50' : 'bg-black/10 border-black text-black placeholder-black/50'} border-2 rounded-lg p-3 focus:outline-none focus:ring-2 ${isDark ? 'focus:ring-white' : 'focus:ring-black'}`}
+                                className="flex-grow bg-gray-700 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-gray-400 focus:outline-none"
                                 onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleAnalysis()}
                             />
-                            <button onClick={handleAnalysis} disabled={isAnswering || !query} className={`${isDark ? 'bg-white text-black hover:bg-white/90 disabled:bg-white/50' : 'bg-black text-white hover:bg-black/90 disabled:bg-black/50'} font-bold py-3 px-6 rounded-lg transition disabled:cursor-not-allowed`}>
+                            <button onClick={handleAnalysis} disabled={isAnswering || !query} className="bg-white text-black font-bold py-3 px-6 rounded-lg hover:bg-gray-300 disabled:bg-gray-500 disabled:cursor-not-allowed">
                                 Ask
                             </button>
                         </div>
                     </div>
                 </footer>
             </div>
-            {(currentUser || user) && allSubjectsList.length > 0 && (
-                <SubjectSidebar
-                    isOpen={isSidebarOpen}
-                    onClose={() => setIsSidebarOpen(false)}
-                    subjects={allSubjectsList}
-                    currentSubjectId={subject.id}
-                    onSelectSubject={handleSubjectChange}
-                    user={currentUser || user!}
-                    theme={theme}
-                />
-            )}
         </div>
     );
 };
 
 // --- Reusable Modal Component ---
-const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode; theme?: Theme }> = ({ isOpen, onClose, title, children, footer, theme = 'dark' }) => {
+const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode }> = ({ isOpen, onClose, title, children, footer }) => {
     if (!isOpen) return null;
-    const isDark = theme === 'dark';
 
     return (
         <div 
-            className={`fixed inset-0 ${isDark ? 'bg-black/60' : 'bg-white/60'} flex items-center justify-center z-50 p-4 transition-opacity duration-300`}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 transition-opacity duration-300"
             onClick={onClose}
         >
             <div 
-                className={`${isDark ? 'bg-black border-white' : 'bg-white border-black'} rounded-xl shadow-2xl w-full max-w-lg border-2 transform transition-transform duration-300 scale-95`}
+                className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700 transform transition-transform duration-300 scale-95"
                 onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
                 style={{ transform: 'scale(1)' }} // Animate in
             >
-                <div className={`flex justify-between items-center p-4 border-b-2 ${isDark ? 'border-white' : 'border-black'}`}>
-                    <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-black'}`}>{title}</h3>
-                    <button onClick={onClose} className={`${isDark ? 'text-white/70 hover:text-white' : 'text-black/70 hover:text-black'} text-2xl`}>&times;</button>
+                <div className="flex justify-between items-center p-4 border-b border-gray-700">
+                    <h3 className="text-xl font-bold text-gray-200">{title}</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
                 </div>
-                <div className={`p-6 ${isDark ? 'text-white' : 'text-black'}`}>{children}</div>
+                <div className="p-6 text-gray-300">{children}</div>
                 {footer && (
-                    <div className={`p-4 ${isDark ? 'bg-white/10' : 'bg-black/10'} rounded-b-xl flex justify-end`}>
+                    <div className="p-4 bg-gray-900/50 rounded-b-xl flex justify-end">
                         {footer}
                     </div>
                 )}
@@ -1035,33 +789,31 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
 
 // --- Interactive Chapter Components ---
 
-const KeywordsDisplay: React.FC<{ keywords: Keyword[]; theme?: Theme }> = ({ keywords, theme = 'dark' }) => {
+const KeywordsDisplay: React.FC<{ keywords: Keyword[] }> = ({ keywords }) => {
     const [selectedKeyword, setSelectedKeyword] = useState<Keyword | null>(null);
-    const isDark = theme === 'dark';
 
     return (
         <div>
-            <h3 className="font-semibold text-lg mb-2">Keywords</h3>
+            <h3 className="font-semibold text-lg text-gray-200 mb-2">Keywords</h3>
             <div className="flex flex-wrap gap-2">
                 {keywords.map(kw => (
-                    <button key={kw.term} onClick={() => setSelectedKeyword(kw)} className={`text-xs ${isDark ? 'text-white bg-white/20 hover:bg-white/30' : 'text-black bg-black/20 hover:bg-black/30'} py-1 px-3 rounded-full transition border-2 ${isDark ? 'border-white/50' : 'border-black/50'}`}>
+                    <button key={kw.term} onClick={() => setSelectedKeyword(kw)} className="text-xs text-gray-300 bg-gray-700/80 py-1 px-3 rounded-full hover:bg-gray-600 transition">
                         {kw.term}
                     </button>
                 ))}
             </div>
             {selectedKeyword && (
-                <div className={`mt-4 p-4 ${isDark ? 'bg-white/10 border-white' : 'bg-black/10 border-black'} rounded-md border-2`}>
-                    <h4 className="font-bold">{selectedKeyword.term}</h4>
-                    <p className="mt-1">{selectedKeyword.definition}</p>
+                <div className="mt-4 p-4 bg-gray-900/50 rounded-md border border-gray-700">
+                    <h4 className="font-bold text-gray-200">{selectedKeyword.term}</h4>
+                    <p className="text-gray-300 mt-1">{selectedKeyword.definition}</p>
                 </div>
             )}
         </div>
     );
 };
 
-const InteractiveMindMapView: React.FC<{ mindMap: MindMapNode; onAskQuestion: (question: string) => void; theme?: Theme }> = ({ mindMap, onAskQuestion, theme = 'dark' }) => {
+const InteractiveMindMapView: React.FC<{ mindMap: MindMapNode; onAskQuestion: (question: string) => void }> = ({ mindMap, onAskQuestion }) => {
     const [activeNode, setActiveNode] = useState<MindMapNode | null>(null);
-    const isDark = theme === 'dark';
 
     const handleReadMore = () => {
         if (activeNode?.explanation) {
@@ -1072,8 +824,8 @@ const InteractiveMindMapView: React.FC<{ mindMap: MindMapNode; onAskQuestion: (q
 
     const RenderNode: React.FC<{ node: MindMapNode; level: number }> = ({ node, level }) => (
         <div style={{ marginLeft: `${level * 20}px` }} className="my-1">
-            <button onClick={() => setActiveNode(node)} className={`w-full text-left flex items-center p-2 rounded-md transition-colors border-2 ${activeNode?.id === node.id ? (isDark ? 'bg-white text-black border-white' : 'bg-black text-white border-black') : (isDark ? 'bg-white/10 hover:bg-white/20 border-white/50' : 'bg-black/10 hover:bg-black/20 border-black/50')}`}>
-                <span className={`font-mono text-xs mr-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>{node.id}</span>
+            <button onClick={() => setActiveNode(node)} className={`w-full text-left flex items-center p-2 rounded-md transition-colors ${activeNode?.id === node.id ? 'bg-gray-600' : 'bg-gray-700/50 hover:bg-gray-700'}`}>
+                <span className="font-mono text-xs mr-2 text-gray-400">{node.id}</span>
                 <span className="font-medium">{node.title}</span>
             </button>
             {node.children && node.children.map(child => <RenderNode key={child.id} node={child} level={level + 1} />)}
@@ -1083,16 +835,16 @@ const InteractiveMindMapView: React.FC<{ mindMap: MindMapNode; onAskQuestion: (q
     if (!mindMap) {
         return (
              <div>
-                <h3 className="font-semibold text-lg mb-2">Chapter Flowchart</h3>
-                <p className={`p-4 ${isDark ? 'text-white/70' : 'text-black/70'}`}>No flowchart available for this chapter.</p>
+                <h3 className="font-semibold text-lg text-gray-200 mb-2">Chapter Flowchart</h3>
+                <p className="p-4 text-gray-400">No flowchart available for this chapter.</p>
             </div>
         )
     }
 
     return (
         <div>
-            <h3 className="font-semibold text-lg mb-2">Chapter Flowchart</h3>
-            <div className={`p-2 border-2 ${isDark ? 'border-white bg-white/10' : 'border-black bg-black/10'} rounded-lg max-h-96 overflow-y-auto`}>
+            <h3 className="font-semibold text-lg text-gray-200 mb-2">Chapter Flowchart</h3>
+            <div className="p-2 border border-gray-700 rounded-lg bg-gray-900/50 max-h-96 overflow-y-auto">
                 <RenderNode node={mindMap} level={0} />
             </div>
 
@@ -1100,10 +852,9 @@ const InteractiveMindMapView: React.FC<{ mindMap: MindMapNode; onAskQuestion: (q
                 isOpen={!!activeNode} 
                 onClose={() => setActiveNode(null)} 
                 title={activeNode?.title ?? ''}
-                theme={theme}
                 footer={
                     activeNode?.explanation ? (
-                        <button onClick={handleReadMore} className={`${isDark ? 'bg-white text-black hover:bg-white/90' : 'bg-black text-white hover:bg-black/90'} font-bold py-2 px-4 rounded-lg transition`}>
+                        <button onClick={handleReadMore} className="bg-white text-black font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition">
                             Read More &rarr;
                         </button>
                     ) : undefined
@@ -1116,8 +867,7 @@ const InteractiveMindMapView: React.FC<{ mindMap: MindMapNode; onAskQuestion: (q
 };
 
 // --- PDF Image Renderer ---
-const ImageViewer: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]; onEnlarge?: (image: ReferencedImage) => void; theme?: Theme }> = ({ image, sourceFiles, onEnlarge, theme = 'dark' }) => {
-    const isDark = theme === 'dark';
+const ImageViewer: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]; onEnlarge?: (image: ReferencedImage) => void; }> = ({ image, sourceFiles, onEnlarge }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -1186,30 +936,29 @@ const ImageViewer: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]
         renderPdfCrop();
     }, [image, sourceFiles]);
 
-    const containerClasses = `${isDark ? 'bg-white/10 border-white' : 'bg-black/10 border-black'} p-4 rounded-lg border-2 flex flex-col items-center justify-center min-h-[200px] ${onEnlarge ? 'cursor-zoom-in' : ''}`;
+    const containerClasses = `bg-gray-900/50 p-4 rounded-lg border border-gray-700 flex flex-col items-center justify-center min-h-[200px] ${onEnlarge ? 'cursor-zoom-in' : ''}`;
 
     return (
         <div className={containerClasses} onClick={onEnlarge ? () => onEnlarge(image) : undefined}>
-            {isLoading && <LoadingSpinner inline theme={theme} />}
-            {error && <p className={`${isDark ? 'text-white border-white' : 'text-black border-black'} text-sm text-center border-2 p-2 rounded`}>{error}</p>}
+            {isLoading && <LoadingSpinner inline />}
+            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
             <canvas ref={canvasRef} className={`transition-opacity duration-300 ${isLoading || error ? 'opacity-0' : 'opacity-100'}`} style={{ maxWidth: '100%', height: 'auto' }} />
-            {!isLoading && !error && <p className={`${isDark ? 'text-white/70' : 'text-black/70'} text-sm mt-2 text-center`}>{image.description}</p>}
+            {!isLoading && !error && <p className="text-gray-400 text-sm mt-2 text-center">{image.description}</p>}
         </div>
     );
 };
 
-const ImageModal: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]; onClose: () => void; theme?: Theme }> = ({ image, sourceFiles, onClose, theme = 'dark' }) => {
-    const isDark = theme === 'dark';
+const ImageModal: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[]; onClose: () => void; }> = ({ image, sourceFiles, onClose }) => {
     return (
         <div 
-            className={`fixed inset-0 ${isDark ? 'bg-black/80' : 'bg-white/80'} flex items-center justify-center z-50 p-4`}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
             onClick={onClose}
         >
             <div className="relative max-w-4xl max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                <ImageViewer image={image} sourceFiles={sourceFiles} theme={theme} />
+                <ImageViewer image={image} sourceFiles={sourceFiles} />
                 <button 
                     onClick={onClose} 
-                    className={`absolute -top-2 -right-2 ${isDark ? 'text-white bg-black border-white' : 'text-black bg-white border-black'} rounded-full h-8 w-8 flex items-center justify-center text-2xl hover:opacity-80 border-2`}
+                    className="absolute -top-2 -right-2 text-white bg-gray-800 rounded-full h-8 w-8 flex items-center justify-center text-2xl hover:bg-gray-700 border border-gray-600"
                     aria-label="Close image view"
                 >
                     &times;
@@ -1221,8 +970,7 @@ const ImageModal: React.FC<{ image: ReferencedImage; sourceFiles: FileContent[];
 
 
 // --- Tutor Response View ---
-const TutorResponseView: React.FC<{ response: TutorResponse, subject: SubjectData, theme?: Theme }> = ({ response, subject, theme = 'dark' }) => {
-    const isDark = theme === 'dark';
+const TutorResponseView: React.FC<{ response: TutorResponse, subject: SubjectData }> = ({ response, subject }) => {
     const [enlargedImage, setEnlargedImage] = useState<ReferencedImage | null>(null);
     const answerRef = useRef<HTMLDivElement>(null);
     const sourceFiles = subject.files;
@@ -1260,32 +1008,32 @@ const TutorResponseView: React.FC<{ response: TutorResponse, subject: SubjectDat
     }, [response.answer]);
     
     return (
-        <div className={`${isDark ? 'bg-white/10 border-white' : 'bg-black/10 border-black'} p-6 rounded-xl border-2 shadow-lg mt-4`}>
+        <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 shadow-lg mt-4">
             <div className="space-y-6">
                 <div
                     ref={answerRef}
-                    className={`prose max-w-none ${isDark ? 'prose-invert prose-p:text-white prose-headings:text-white' : 'prose-p:text-black prose-headings:text-black'}`}
+                    className="prose prose-invert max-w-none prose-p:text-gray-300 prose-headings:text-gray-100"
                     dangerouslySetInnerHTML={{ __html: answerHtml }}
                 />
                  {response.images && response.images.length > 0 && (
                     <div>
-                        <h3 className="font-semibold text-lg mb-2 mt-4">Referenced Images</h3>
+                        <h3 className="font-semibold text-lg text-gray-200 mb-2 mt-4">Referenced Images</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {response.images.map((img, index) => (
-                                <ImageViewer key={index} image={img} sourceFiles={sourceFiles} onEnlarge={setEnlargedImage} theme={theme}/>
+                                <ImageViewer key={index} image={img} sourceFiles={sourceFiles} onEnlarge={setEnlargedImage}/>
                             ))}
                         </div>
                     </div>
                 )}
                  {response.citations.length > 0 && (
                     <div>
-                        <h3 className="font-semibold text-lg mb-2 mt-4">References</h3>
-                        <ul className={`space-y-1 list-disc list-inside ${isDark ? 'bg-white/10' : 'bg-black/10'} p-4 rounded-md border-2 ${isDark ? 'border-white/50' : 'border-black/50'}`}>
+                        <h3 className="font-semibold text-lg text-gray-200 mb-2 mt-4">References</h3>
+                        <ul className="space-y-1 list-disc list-inside bg-gray-900/50 p-4 rounded-md">
                             {response.citations.map((cite, index) => {
                                 const chapterTitle = fileNameToChapterTitleMap.get(cite.fileName) || cite.fileName;
                                 return (
-                                    <li key={index} className={`text-sm ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-                                        Chapter: <span className={`font-medium ${isDark ? 'text-white' : 'text-black'}`}>'{chapterTitle}'</span>, page {cite.page}
+                                    <li key={index} className="text-sm text-gray-400">
+                                        Chapter: <span className="font-medium text-gray-300">'{chapterTitle}'</span>, page {cite.page}
                                     </li>
                                 );
                             })}
@@ -1294,10 +1042,10 @@ const TutorResponseView: React.FC<{ response: TutorResponse, subject: SubjectDat
                 )}
                  {response.sources && response.sources.length > 0 && (
                      <div>
-                        <h3 className="font-semibold text-lg mb-2 mt-4">Sources Consulted</h3>
+                        <h3 className="font-semibold text-lg text-gray-200 mb-2 mt-4">Sources Consulted</h3>
                         <ul className="flex flex-wrap gap-2">
                             {response.sources.map((source, index) => (
-                                <li key={index} className={`text-xs ${isDark ? 'text-white bg-white/20 border-white/50' : 'text-black bg-black/20 border-black/50'} py-1 px-3 rounded-full border-2`}>
+                                <li key={index} className="text-xs text-gray-300 bg-gray-700/80 py-1 px-3 rounded-full">
                                     {source}
                                 </li>
                             ))}
@@ -1309,8 +1057,7 @@ const TutorResponseView: React.FC<{ response: TutorResponse, subject: SubjectDat
                 <ImageModal 
                     image={enlargedImage} 
                     sourceFiles={sourceFiles} 
-                    onClose={() => setEnlargedImage(null)}
-                    theme={theme}
+                    onClose={() => setEnlargedImage(null)} 
                 />
             )}
         </div>
