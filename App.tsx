@@ -385,10 +385,6 @@ export default function App() {
         checkAuthStatus();
     };
 
-    const themeClasses = theme === 'dark' 
-        ? { bg: 'bg-black', text: 'text-white', border: 'border-white', bgAlt: 'bg-white', textAlt: 'text-black' }
-        : { bg: 'bg-white', text: 'text-black', border: 'border-black', bgAlt: 'bg-black', textAlt: 'text-white' };
-
     return (
         <div className={theme === 'dark' ? 'bg-black text-white min-h-screen' : 'bg-white text-black min-h-screen'}>
             <ThemeToggle theme={theme} onToggle={toggleTheme} />
@@ -398,7 +394,7 @@ export default function App() {
                     case 'auth': return <AuthView onLogin={handleLogin} theme={theme} />;
                     case 'admin': return <AdminView onCorpusUpdate={() => setAppState('dashboard')} user={currentUser!} onLogout={handleLogout} theme={theme} />;
                     case 'dashboard': return <DashboardView user={currentUser!} onLogout={handleLogout} onSwitchToAdmin={() => setAppState('admin')} theme={theme} />;
-                    default: return <div>Error: Invalid application state.</div>;
+                    default: return <div className={theme === 'dark' ? 'text-white' : 'text-black'}>Error: Invalid application state.</div>;
                 }
             })()}
         </div>
@@ -991,14 +987,14 @@ const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onB
                     </div>
                 </footer>
             </div>
-            {currentUser && (
+            {(currentUser || user) && allSubjectsList.length > 0 && (
                 <SubjectSidebar
                     isOpen={isSidebarOpen}
                     onClose={() => setIsSidebarOpen(false)}
                     subjects={allSubjectsList}
                     currentSubjectId={subject.id}
                     onSelectSubject={handleSubjectChange}
-                    user={currentUser}
+                    user={currentUser || user!}
                     theme={theme}
                 />
             )}
