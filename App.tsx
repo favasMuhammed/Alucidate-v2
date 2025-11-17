@@ -179,6 +179,117 @@ const Header: React.FC<{ subtitle?: string }> = ({ subtitle }) => (
     </header>
 );
 
+// --- Sidebar Icons ---
+const MenuIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+);
+
+const CloseIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+);
+
+const BookIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+);
+
+// --- Subject Sidebar Component ---
+const SubjectSidebar: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    subjects: SubjectData[];
+    currentSubjectId: string | null;
+    onSelectSubject: (subject: SubjectData) => void;
+    user: User;
+}> = ({ isOpen, onClose, subjects, currentSubjectId, onSelectSubject, user }) => {
+    return (
+        <>
+            {/* Overlay */}
+            {isOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
+                    onClick={onClose}
+                />
+            )}
+            
+            {/* Sidebar */}
+            <div
+                className={`fixed top-0 right-0 h-full w-80 bg-gray-800 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out ${
+                    isOpen ? 'translate-x-0' : 'translate-x-full'
+                } flex flex-col shadow-2xl`}
+            >
+                {/* Sidebar Header */}
+                <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-900/50">
+                    <div className="flex items-center gap-2">
+                        <BookIcon className="h-5 w-5 text-gray-300" />
+                        <h2 className="text-lg font-semibold text-gray-200">Subjects</h2>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-1 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition"
+                        aria-label="Close sidebar"
+                    >
+                        <CloseIcon className="h-5 w-5" />
+                    </button>
+                </div>
+
+                {/* Sidebar Content */}
+                <div className="flex-1 overflow-y-auto p-4">
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-400 mb-2">{user.className}</p>
+                        <p className="text-xs text-gray-500">{subjects.length} subject{subjects.length !== 1 ? 's' : ''} available</p>
+                    </div>
+                    
+                    {subjects.length === 0 ? (
+                        <div className="text-center py-8">
+                            <p className="text-gray-400 text-sm">No subjects available</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {subjects.map((subject) => (
+                                <button
+                                    key={subject.id}
+                                    onClick={() => {
+                                        onSelectSubject(subject);
+                                        onClose();
+                                    }}
+                                    className={`w-full text-left p-3 rounded-lg border transition-all ${
+                                        currentSubjectId === subject.id
+                                            ? 'bg-gray-700 border-gray-500 text-white'
+                                            : 'bg-gray-700/50 border-gray-600 text-gray-300 hover:bg-gray-700 hover:border-gray-500'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium">{subject.subject}</span>
+                                        {currentSubjectId === subject.id && (
+                                            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Current</span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        {subject.files.length} chapter{subject.files.length !== 1 ? 's' : ''}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Sidebar Footer */}
+                <div className="p-4 border-t border-gray-700 bg-gray-900/50">
+                    <p className="text-xs text-gray-500 text-center">
+                        Switch between subjects quickly
+                    </p>
+                </div>
+            </div>
+        </>
+    );
+};
+
 // --- Main App Component (Router) ---
 type AppState = 'loading' | 'auth' | 'admin' | 'dashboard';
 
@@ -548,7 +659,7 @@ const DashboardView: React.FC<{ user: User; onLogout: () => void; onSwitchToAdmi
     }, [user.className]);
     
     if (selectedSubject) {
-        return <SubjectHomeView subject={selectedSubject} onBack={() => setSelectedSubject(null)} user={user} />;
+        return <SubjectHomeView subject={selectedSubject} onBack={() => setSelectedSubject(null)} user={user} allSubjects={subjects} onSubjectChange={(newSubject) => setSelectedSubject(newSubject)} />;
     }
 
     return (
@@ -582,10 +693,12 @@ const DashboardView: React.FC<{ user: User; onLogout: () => void; onSwitchToAdmi
 };
 
 // --- Subject Home / Chapter List View ---
-const SubjectHomeView: React.FC<{ subject: SubjectData; onBack: () => void; user: User; }> = ({ subject, onBack, user }) => {
+const SubjectHomeView: React.FC<{ subject: SubjectData; onBack: () => void; user: User; allSubjects?: SubjectData[]; onSubjectChange?: (subject: SubjectData) => void; }> = ({ subject, onBack, user, allSubjects, onSubjectChange }) => {
     const [chapters, setChapters] = useState<ChapterDetails[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedChapter, setSelectedChapter] = useState<ChapterDetails | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [allSubjectsList, setAllSubjectsList] = useState<SubjectData[]>(allSubjects || []);
 
     useEffect(() => {
         const loadChapters = async () => {
@@ -611,13 +724,36 @@ const SubjectHomeView: React.FC<{ subject: SubjectData; onBack: () => void; user
         };
         loadChapters();
     }, [subject.id]);
+
+    useEffect(() => {
+        if (allSubjects && allSubjects.length > 0) {
+            setAllSubjectsList(allSubjects);
+        } else {
+            dbService.getSubjectsByClass(user.className)
+                .then(setAllSubjectsList)
+                .catch(console.error);
+        }
+    }, [user.className, allSubjects]);
     
     if (selectedChapter) {
-        return <ChapterView chapter={selectedChapter} subject={subject} onBack={() => setSelectedChapter(null)} />;
+        return <ChapterView chapter={selectedChapter} subject={subject} onBack={() => setSelectedChapter(null)} allSubjects={allSubjectsList} onSubjectChange={onSubjectChange} user={user} />;
     }
 
+    const handleSubjectChange = (newSubject: SubjectData) => {
+        if (onSubjectChange) {
+            onSubjectChange(newSubject);
+        }
+    };
+
     return (
-         <div className="min-h-screen bg-gray-900 text-gray-200 p-8">
+         <div className="min-h-screen bg-gray-900 text-gray-200 p-8 relative">
+            <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="fixed top-4 right-4 z-30 p-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-lg text-gray-300 hover:text-white transition shadow-lg"
+                aria-label="Open subjects sidebar"
+            >
+                <MenuIcon className="h-5 w-5" />
+            </button>
             <div className="max-w-4xl mx-auto">
                 <header className="mb-8 relative">
                     <button onClick={onBack} className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center text-gray-300 hover:text-white">
@@ -642,22 +778,55 @@ const SubjectHomeView: React.FC<{ subject: SubjectData; onBack: () => void; user
                      )}
                 </div>
             </div>
+            <SubjectSidebar
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                subjects={allSubjectsList}
+                currentSubjectId={subject.id}
+                onSelectSubject={handleSubjectChange}
+                user={user}
+            />
         </div>
     );
 };
 
 
 // --- Chapter Detail View ---
-const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onBack: () => void; }> = ({ chapter, subject, onBack }) => {
+const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onBack: () => void; allSubjects?: SubjectData[]; onSubjectChange?: (subject: SubjectData) => void; user?: User; }> = ({ chapter, subject, onBack, allSubjects, onSubjectChange, user }) => {
     const [conversation, setConversation] = useState<ConversationTurn[]>([]);
     const [isAnswering, setIsAnswering] = useState(false);
     const [query, setQuery] = useState('');
     const [error, setError] = useState('');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [allSubjectsList, setAllSubjectsList] = useState<SubjectData[]>(allSubjects || []);
+    const [currentUser, setCurrentUser] = useState<User | null>(user || null);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [conversation, isAnswering]);
+
+    useEffect(() => {
+        if (allSubjects && allSubjects.length > 0) {
+            setAllSubjectsList(allSubjects);
+        } else if (!user) {
+            const userEmail = localStorage.getItem('currentUserEmail');
+            if (userEmail) {
+                dbService.getUser(userEmail).then(loadedUser => {
+                    if (loadedUser) {
+                        setCurrentUser(loadedUser);
+                        dbService.getSubjectsByClass(loadedUser.className)
+                            .then(setAllSubjectsList)
+                            .catch(console.error);
+                    }
+                });
+            }
+        } else {
+            dbService.getSubjectsByClass(user.className)
+                .then(setAllSubjectsList)
+                .catch(console.error);
+        }
+    }, [allSubjects, user]);
 
     const findChapterNode = (structure: MindMapNode, chapterId: string): MindMapNode | null => {
         return structure.children.find(chap => chap.id === chapterId) || null;
@@ -699,8 +868,21 @@ const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onB
         }
     };
 
+    const handleSubjectChange = (newSubject: SubjectData) => {
+        if (onSubjectChange) {
+            onSubjectChange(newSubject);
+        }
+    };
+
     return (
-        <div className="h-screen bg-gray-900 text-gray-200 flex flex-col p-4 sm:p-6 lg:p-8">
+        <div className="h-screen bg-gray-900 text-gray-200 flex flex-col p-4 sm:p-6 lg:p-8 relative">
+            <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="fixed top-4 right-4 z-30 p-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-lg text-gray-300 hover:text-white transition shadow-lg"
+                aria-label="Open subjects sidebar"
+            >
+                <MenuIcon className="h-5 w-5" />
+            </button>
             <div className="max-w-4xl mx-auto w-full flex flex-col flex-grow min-h-0">
                 <header className="mb-4 relative flex-shrink-0">
                     <button onClick={onBack} className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center text-gray-300 hover:text-white">
@@ -753,6 +935,16 @@ const ChapterView: React.FC<{ chapter: ChapterDetails; subject: SubjectData; onB
                     </div>
                 </footer>
             </div>
+            {currentUser && (
+                <SubjectSidebar
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                    subjects={allSubjectsList}
+                    currentSubjectId={subject.id}
+                    onSelectSubject={handleSubjectChange}
+                    user={currentUser}
+                />
+            )}
         </div>
     );
 };
