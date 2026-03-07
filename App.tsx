@@ -169,7 +169,7 @@ const BackIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 const AlucidateLogo: React.FC = () => (
     <h1 className="text-4xl sm:text-5xl font-light text-gray-200 tracking-wider">
-        <span className="font-semibold text-white">AI</span>lucidate
+        <span className="font-semibold text-white">AI</span>ucidate
     </h1>
 );
 const Header: React.FC<{ subtitle?: string }> = ({ subtitle }) => (

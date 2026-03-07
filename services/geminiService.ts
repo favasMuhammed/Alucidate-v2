@@ -95,10 +95,57 @@ export const generateChapterDetails_Interactive = async (
         });
         const jsonStr = response.text.trim();
         return JSON.parse(jsonStr);
-    } catch (error)
+    } catch (error: any)
     {
         console.error(`Error generating details for chapter ${chapterNumber}:`, error);
-        throw new Error(`Failed to generate details for chapter ${chapterNumber}.`);
+        
+        // Try to extract error from various possible structures
+        let errorCode: number | undefined;
+        let errorStatus: string | undefined;
+        let errorMessage: string | undefined;
+        
+        // Check direct error properties
+        if (error?.error) {
+            errorCode = error.error.code;
+            errorStatus = error.error.status;
+            errorMessage = error.error.message;
+        } else if (error?.code !== undefined) {
+            errorCode = error.code;
+            errorStatus = error.status;
+            errorMessage = error.message;
+        }
+        
+        // Try parsing error.message if it's a JSON string (common with ApiError)
+        if (!errorCode && error?.message) {
+            try {
+                const parsed = JSON.parse(error.message);
+                if (parsed?.error) {
+                    errorCode = parsed.error.code;
+                    errorStatus = parsed.error.status;
+                    errorMessage = parsed.error.message;
+                }
+            } catch {
+                // Not JSON, use as-is
+                errorMessage = error.message;
+            }
+        }
+        
+        // Handle quota exceeded (429)
+        if (errorCode === 429 || errorStatus === 'RESOURCE_EXHAUSTED') {
+            throw new Error(`API quota exceeded. Please check your Gemini API billing and quota limits at https://ai.dev/usage?tab=rate-limit. The API key may have reached its rate limit or usage quota.`);
+        }
+        
+        // Handle authentication errors (401)
+        if (errorCode === 401 || errorStatus === 'UNAUTHENTICATED') {
+            throw new Error(`Invalid API key. Please check your GEMINI_API_KEY in .env.local.`);
+        }
+        
+        // Use extracted message or fallback
+        if (errorMessage) {
+            throw new Error(`API Error: ${errorMessage}`);
+        }
+        
+        throw new Error(`Failed to generate details for chapter ${chapterNumber}: ${error?.message || 'Unknown error'}`);
     }
 };
 
@@ -225,8 +272,55 @@ export const analyzeFiles = async (
         throw new Error("The AI returned an invalid response. Please try again.");
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error analyzing files:", error);
+    
+    // Try to extract error from various possible structures
+    let errorCode: number | undefined;
+    let errorStatus: string | undefined;
+    let errorMessage: string | undefined;
+    
+    // Check direct error properties
+    if (error?.error) {
+        errorCode = error.error.code;
+        errorStatus = error.error.status;
+        errorMessage = error.error.message;
+    } else if (error?.code !== undefined) {
+        errorCode = error.code;
+        errorStatus = error.status;
+        errorMessage = error.message;
+    }
+    
+    // Try parsing error.message if it's a JSON string (common with ApiError)
+    if (!errorCode && error?.message) {
+        try {
+            const parsed = JSON.parse(error.message);
+            if (parsed?.error) {
+                errorCode = parsed.error.code;
+                errorStatus = parsed.error.status;
+                errorMessage = parsed.error.message;
+            }
+        } catch {
+            // Not JSON, use as-is
+            errorMessage = error.message;
+        }
+    }
+    
+    // Handle quota exceeded (429)
+    if (errorCode === 429 || errorStatus === 'RESOURCE_EXHAUSTED') {
+        throw new Error(`API quota exceeded. Please check your Gemini API billing and quota limits at https://ai.dev/usage?tab=rate-limit.`);
+    }
+    
+    // Handle authentication errors (401)
+    if (errorCode === 401 || errorStatus === 'UNAUTHENTICATED') {
+        throw new Error(`Invalid API key. Please check your GEMINI_API_KEY in .env.local.`);
+    }
+    
+    // Use extracted message or fallback
+    if (errorMessage) {
+        throw new Error(`API Error: ${errorMessage}`);
+    }
+    
     if (error instanceof Error) {
         throw new Error(`Failed to analyze files: ${error.message}`);
     }
