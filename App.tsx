@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { analyzeFiles, findRelevantFiles, generateChapterDetails_Interactive } from './services/geminiService';
+import { analyzeFiles, findRelevantFiles, generateChapterDetails_Interactive } from './services/aiService';
 import { TutorResponse, FileContent, ReferencedImage, CropCoordinates, MindMapNode, ConversationTurn, ChapterDetails, User, SubjectData, Keyword } from './types';
 
 // @ts-ignore
