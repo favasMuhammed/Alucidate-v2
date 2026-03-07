@@ -21,6 +21,7 @@ interface IDBService {
     saveSubject(subject: SubjectData): Promise<IDBValidKey>;
     getChapterDetails(id: string): Promise<ChapterDetails | undefined>;
     saveChapterDetails(details: ChapterDetails): Promise<IDBValidKey>;
+    getChaptersBySubject(subjectId: string): Promise<ChapterDetails[]>;
     clearDB(): Promise<void>;
     hasSubjects(): Promise<boolean>;
 }
@@ -85,6 +86,17 @@ export const dbService: IDBService = {
     },
     saveChapterDetails(details: ChapterDetails) {
         return (this as IDBService).dbRequest<IDBValidKey>(CHAPTERS_STORE, 'readwrite', store => store.put(details));
+    },
+    async getChaptersBySubject(subjectId: string) {
+        const results = await (this as IDBService).dbRequest<ChapterDetails[]>(CHAPTERS_STORE, 'readonly', store => {
+            return store.openCursor();
+        });
+
+        // Manual filter and sort as we don't have a specific index on subjectId yet
+        const filtered = results ? (results as any).filter((c: ChapterDetails) => c.subjectId === subjectId) : [];
+        return filtered.sort((a: any, b: any) =>
+            a.chapterId.localeCompare(b.chapterId, undefined, { numeric: true, sensitivity: 'base' })
+        );
     },
     clearDB() {
         return new Promise<void>((resolve, reject) => {

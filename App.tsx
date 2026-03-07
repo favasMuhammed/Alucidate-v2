@@ -80,6 +80,15 @@ export default function App() {
     const [appState, setAppState] = useState<AppState>('loading');
     const [currentUser, setCurrentUser] = useState<User | null>(null);
 
+    // Pre-warm the backend on mount (Render Free Tier spin-up mitigation)
+    useEffect(() => {
+        const pingBackend = async () => {
+            const api_v = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000';
+            try { fetch(`${api_v}/health`).catch(() => { }); } catch { }
+        };
+        pingBackend();
+    }, []);
+
     const checkAuthStatus = useCallback(async () => {
         setAppState('loading');
         try {
@@ -490,24 +499,15 @@ const SubjectHomeView: React.FC<{ subject: SubjectData; onBack: () => void; user
     useEffect(() => {
         const loadChapters = async () => {
             setIsLoading(true);
-            const db = await dbService.openDB();
-            const transaction = db.transaction(CHAPTERS_STORE, 'readonly');
-            const store = transaction.objectStore(CHAPTERS_STORE);
-            const request = store.openCursor();
-            const results: ChapterDetails[] = [];
-            request.onsuccess = (event) => {
-                const cursor = (event.target as IDBRequest).result;
-                if (cursor) {
-                    if (cursor.value.subjectId === subject.id) {
-                        results.push(cursor.value);
-                    }
-                    cursor.continue();
-                } else {
-                    results.sort((a, b) => a.chapterId.localeCompare(b.chapterId, undefined, { numeric: true, sensitivity: 'base' }));
-                    setChapters(results);
-                    setIsLoading(false);
-                }
-            };
+            try {
+                // We'll use a new method on dbService to keep things encapsulated
+                const results = await dbService.getChaptersBySubject(subject.id);
+                setChapters(results);
+            } catch (error) {
+                console.error('Failed to load chapters:', error);
+            } finally {
+                setIsLoading(false);
+            }
         };
         loadChapters();
     }, [subject.id]);

@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 
@@ -51,8 +51,33 @@ const otpSendLimiter = rateLimit({
 // --- In-memory OTP store: email -> { code, expiresAt, lastSent, failedAttempts, lockedUntil } ---
 const otpStore = new Map();
 
-// --- Resend Client ---
-const resend = new Resend(process.env.RESEND_API_KEY);
+// --- Resend Email Function ---
+async function sendEmail({ to, subject, html }) {
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    if (!RESEND_API_KEY) {
+        throw new Error('RESEND_API_KEY is not configured on the server.');
+    }
+
+    const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            from: 'Alucidate <onboarding@resend.dev>', // Resend default testing domain
+            to,
+            subject,
+            html,
+        }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.message || 'Failed to send email via Resend.');
+    }
+    return data;
+}
 
 // --- Cleanup expired OTPs every 5 minutes ---
 setInterval(() => {
@@ -116,29 +141,26 @@ app.post('/api/otp/send', otpSendLimiter, async (req, res) => {
             console.log(`[DEV] OTP for ${email}: ${otpCode}`);
         }
 
-        const { data, error } = await resend.emails.send({
-            from: 'Alucidate <onboarding@resend.dev>', // Resend default for testing, user should update to their domain later
+        const emailHtml = `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; background: #0d1117; border: 1px solid #1e2a42; border-radius: 12px; overflow: hidden;">
+                <div style="background: linear-gradient(135deg, #1a2744 0%, #0d1117 100%); padding: 32px 40px; border-bottom: 1px solid #1e2a42;">
+                    <h1 style="margin: 0; font-size: 22px; color: #e2e8f0; font-weight: 600; letter-spacing: -0.02em;">AI<span style="font-weight: 300;">ucidate</span></h1>
+                </div>
+                <div style="padding: 40px;">
+                    <p style="margin: 0 0 24px; color: #94a3b8; font-size: 15px; line-height: 1.6;">Here is your secure sign-in code:</p>
+                    <div style="background: #1a2744; border: 1px solid #2d4a8a; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 28px;">
+                        <span style="font-size: 40px; font-weight: 700; letter-spacing: 8px; color: #60a5fa; font-family: 'Courier New', monospace;">${otpCode}</span>
+                    </div>
+                    <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.6;">This code expires in <strong style="color: #94a3b8;">5 minutes</strong>. If you did not request this, you can safely ignore this email.</p>
+                </div>
+            </div>
+        `;
+
+        await sendEmail({
             to: email,
             subject: 'Your Alucidate Verification Code',
-            html: `
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; background: #0d1117; border: 1px solid #1e2a42; border-radius: 12px; overflow: hidden;">
-                    <div style="background: linear-gradient(135deg, #1a2744 0%, #0d1117 100%); padding: 32px 40px; border-bottom: 1px solid #1e2a42;">
-                        <h1 style="margin: 0; font-size: 22px; color: #e2e8f0; font-weight: 600; letter-spacing: -0.02em;">AI<span style="font-weight: 300;">ucidate</span></h1>
-                    </div>
-                    <div style="padding: 40px;">
-                        <p style="margin: 0 0 24px; color: #94a3b8; font-size: 15px; line-height: 1.6;">Here is your secure sign-in code:</p>
-                        <div style="background: #1a2744; border: 1px solid #2d4a8a; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 28px;">
-                            <span style="font-size: 40px; font-weight: 700; letter-spacing: 8px; color: #60a5fa; font-family: 'Courier New', monospace;">${otpCode}</span>
-                        </div>
-                        <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.6;">This code expires in <strong style="color: #94a3b8;">5 minutes</strong>. If you did not request this, you can safely ignore this email.</p>
-                    </div>
-                </div>
-            `,
+            html: emailHtml,
         });
-
-        if (error) {
-            throw new Error(error.message);
-        }
 
         res.json({ success: true, message: 'Verification code sent.' });
     } catch (error) {
