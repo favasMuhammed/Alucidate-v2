@@ -3,8 +3,8 @@
   <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjE1a3o3eXMyOW8wNXlkOTNidDZtdGZkNmhmcmZ5MTB3ZThwaHBtbCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/L1R1tvI9svkIWwpVYr/giphy.gif" width="120" alt="Brain Loading Animation"/>
   <h1 align="center">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=700&size=45&pause=1000&color=A78BFA&center=true&vCenter=true&width=500&lines=Welcome+to+AIucidate;Interactive+Learning;Smarter+Syllabus">
-      <img alt="Typing SVG" src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=700&size=45&pause=1000&color=6D28D9&center=true&vCenter=true&width=500&lines=Welcome+to+AIucidate;Interactive+Learning;Smarter+Syllabus">
+      <source media="(prefers-color-scheme: dark)" srcset="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=700&size=45&pause=1000&color=A78BFA&center=true&vCenter=true&width=700&lines=Welcome+to+AIucidate;Interactive+Learning;Smarter+Syllabus">
+      <img alt="Typing SVG" src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=700&size=45&pause=1000&color=6D28D9&center=true&vCenter=true&width=700&lines=Welcome+to+AIucidate;Interactive+Learning;Smarter+Syllabus">
     </picture>
   </h1>
   <p align="center">
@@ -17,10 +17,6 @@
     <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />
     <img src="https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E" />
   </p>
-  
-  <br/>
-  
-  <img width="900" style="border-radius: 10px; box-shadow: 0px 10px 30px rgba(0,0,0,0.5);" alt="Alucidate App Preview" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
 <br/>
