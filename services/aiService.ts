@@ -1,11 +1,13 @@
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { FileContent, TutorResponse, MindMapNode, ConversationTurn, ChapterDetails, Keyword } from '../types';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set");
+const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+
+if (!apiKey) {
+    throw new Error("VITE_GEMINI_API_KEY environment variable not set");
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: apiKey });
 
 // Helper to create a nested schema safely, now including page numbers
 const createMindMapNodeSchema = (depth: number, withExplanation: boolean): object => {
@@ -95,15 +97,14 @@ export const generateChapterDetails_Interactive = async (
         });
         const jsonStr = response.text.trim();
         return JSON.parse(jsonStr);
-    } catch (error: any)
-    {
+    } catch (error: any) {
         console.error(`Error generating details for chapter ${chapterNumber}:`, error);
-        
+
         // Try to extract error from various possible structures
         let errorCode: number | undefined;
         let errorStatus: string | undefined;
         let errorMessage: string | undefined;
-        
+
         // Check direct error properties
         if (error?.error) {
             errorCode = error.error.code;
@@ -114,7 +115,7 @@ export const generateChapterDetails_Interactive = async (
             errorStatus = error.status;
             errorMessage = error.message;
         }
-        
+
         // Try parsing error.message if it's a JSON string (common with ApiError)
         if (!errorCode && error?.message) {
             try {
@@ -129,22 +130,22 @@ export const generateChapterDetails_Interactive = async (
                 errorMessage = error.message;
             }
         }
-        
+
         // Handle quota exceeded (429)
         if (errorCode === 429 || errorStatus === 'RESOURCE_EXHAUSTED') {
             throw new Error(`API quota exceeded. Please check your Gemini API billing and quota limits at https://ai.dev/usage?tab=rate-limit. The API key may have reached its rate limit or usage quota.`);
         }
-        
+
         // Handle authentication errors (401)
         if (errorCode === 401 || errorStatus === 'UNAUTHENTICATED') {
             throw new Error(`Invalid API key. Please check your GEMINI_API_KEY in .env.local.`);
         }
-        
+
         // Use extracted message or fallback
         if (errorMessage) {
             throw new Error(`API Error: ${errorMessage}`);
         }
-        
+
         throw new Error(`Failed to generate details for chapter ${chapterNumber}: ${error?.message || 'Unknown error'}`);
     }
 };
@@ -164,45 +165,45 @@ export const findRelevantFiles = async (
 
 
 const analysisResponseSchema = {
-  type: Type.OBJECT,
-  properties: {
-    answer: {
-      type: Type.STRING,
-      description: "A comprehensive answer in Markdown. CRITICAL: For all mathematical equations, use KaTeX format. Wrap inline math with `$` (e.g., `$E=mc^2$`) and block math with `$$` (e.g., `$$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$`).",
-    },
-    citations: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          fileName: { type: Type.STRING },
-          page: { type: Type.INTEGER, description: "The absolute page number from the original textbook." },
+    type: Type.OBJECT,
+    properties: {
+        answer: {
+            type: Type.STRING,
+            description: "A comprehensive answer in Markdown. CRITICAL: For all mathematical equations, use KaTeX format. Wrap inline math with `$` (e.g., `$E=mc^2$`) and block math with `$$` (e.g., `$$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$`).",
         },
-        required: ["fileName", "page"],
-      },
-    },
-    images: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          fileName: { type: Type.STRING },
-          page: { type: Type.INTEGER },
-          description: { type: Type.STRING },
-          cropCoordinates: {
-            type: Type.OBJECT,
-            properties: {
-              x: { type: Type.NUMBER }, y: { type: Type.NUMBER },
-              width: { type: Type.NUMBER }, height: { type: Type.NUMBER }
+        citations: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    fileName: { type: Type.STRING },
+                    page: { type: Type.INTEGER, description: "The absolute page number from the original textbook." },
+                },
+                required: ["fileName", "page"],
             },
-            required: ["x", "y", "width", "height"],
-          }
         },
-        required: ["fileName", "page", "description", "cropCoordinates"],
-      }
-    }
-  },
-  required: ["answer", "citations", "images"],
+        images: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    fileName: { type: Type.STRING },
+                    page: { type: Type.INTEGER },
+                    description: { type: Type.STRING },
+                    cropCoordinates: {
+                        type: Type.OBJECT,
+                        properties: {
+                            x: { type: Type.NUMBER }, y: { type: Type.NUMBER },
+                            width: { type: Type.NUMBER }, height: { type: Type.NUMBER }
+                        },
+                        required: ["x", "y", "width", "height"],
+                    }
+                },
+                required: ["fileName", "page", "description", "cropCoordinates"],
+            }
+        }
+    },
+    required: ["answer", "citations", "images"],
 };
 
 
@@ -212,13 +213,13 @@ export const analyzeFiles = async (
     conversationHistory: ConversationTurn[],
     chapterContext?: { chapterTitle: string; chapterId: string; pageOffset: number; }
 ): Promise<TutorResponse> => {
-  const model = "gemini-2.5-pro";
+    const model = "gemini-2.5-pro";
 
-  const chapterInstruction = chapterContext
-    ? `The user is studying Chapter ${chapterContext.chapterId}: "${chapterContext.chapterTitle}". The provided PDF contains ONLY this chapter's content. Focus your answer on this content, but you may infer connections to broader topics. IMPORTANT: All page number citations must be offset by ${chapterContext.pageOffset} to reflect the correct page in the original textbook.`
-    : `Answer based on the entire set of provided documents. Page citations should be the absolute page numbers from the files.`;
+    const chapterInstruction = chapterContext
+        ? `The user is studying Chapter ${chapterContext.chapterId}: "${chapterContext.chapterTitle}". The provided PDF contains ONLY this chapter's content. Focus your answer on this content, but you may infer connections to broader topics. IMPORTANT: All page number citations must be offset by ${chapterContext.pageOffset} to reflect the correct page in the original textbook.`
+        : `Answer based on the entire set of provided documents. Page citations should be the absolute page numbers from the files.`;
 
-  const systemInstruction = `You are an AI Academic Tutor. Your purpose is to provide a clear, comprehensive answer based EXCLUSIVELY on the provided textbook PDFs.
+    const systemInstruction = `You are an AI Academic Tutor. Your purpose is to provide a clear, comprehensive answer based EXCLUSIVELY on the provided textbook PDFs.
 
     Instructions:
     1.  Analyze the conversation history for context.
@@ -229,7 +230,7 @@ export const analyzeFiles = async (
     6.  You MUST cite your sources by file and page number. Remember to apply the page offset if one is provided.
     7.  Return a single JSON object matching the required schema.`;
 
-  const contents: Part[] = [];
+    const contents: Part[] = [];
 
     if (conversationHistory.length > 0) {
         contents.push({ text: '--- CONVERSATION HISTORY ---' });
@@ -240,90 +241,90 @@ export const analyzeFiles = async (
         contents.push({ text: '--- END HISTORY ---' });
     }
 
-  contents.push(
-    { text: `--- CURRENT TASK ---`},
-    { text: `Question: "${query}"` },
-    { text: `--- PROVIDED TEXTBOOKS (PDF format) ---` }
-  );
+    contents.push(
+        { text: `--- CURRENT TASK ---` },
+        { text: `Question: "${query}"` },
+        { text: `--- PROVIDED TEXTBOOKS (PDF format) ---` }
+    );
 
-  for (const file of relevantFiles) {
-    contents.push({ text: `Textbook: ${file.fileName}` });
-    contents.push({ inlineData: { mimeType: 'application/pdf', data: file.fileBase64 } });
-  }
+    for (const file of relevantFiles) {
+        contents.push({ text: `Textbook: ${file.fileName}` });
+        contents.push({ inlineData: { mimeType: 'application/pdf', data: file.fileBase64 } });
+    }
 
-  try {
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: contents,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: analysisResponseSchema,
-        systemInstruction: systemInstruction,
-      },
-    });
-    
-    const jsonStr = response.text.trim();
     try {
-        const parsedResponse = JSON.parse(jsonStr);
-        parsedResponse.sources = relevantFiles.map(f => f.fileName);
-        return parsedResponse as TutorResponse;
-    } catch (e) {
-        console.error("Failed to parse JSON response:", jsonStr, e);
-        throw new Error("The AI returned an invalid response. Please try again.");
-    }
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: contents,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: analysisResponseSchema,
+                systemInstruction: systemInstruction,
+            },
+        });
 
-  } catch (error: any) {
-    console.error("Error analyzing files:", error);
-    
-    // Try to extract error from various possible structures
-    let errorCode: number | undefined;
-    let errorStatus: string | undefined;
-    let errorMessage: string | undefined;
-    
-    // Check direct error properties
-    if (error?.error) {
-        errorCode = error.error.code;
-        errorStatus = error.error.status;
-        errorMessage = error.error.message;
-    } else if (error?.code !== undefined) {
-        errorCode = error.code;
-        errorStatus = error.status;
-        errorMessage = error.message;
-    }
-    
-    // Try parsing error.message if it's a JSON string (common with ApiError)
-    if (!errorCode && error?.message) {
+        const jsonStr = response.text.trim();
         try {
-            const parsed = JSON.parse(error.message);
-            if (parsed?.error) {
-                errorCode = parsed.error.code;
-                errorStatus = parsed.error.status;
-                errorMessage = parsed.error.message;
-            }
-        } catch {
-            // Not JSON, use as-is
+            const parsedResponse = JSON.parse(jsonStr);
+            parsedResponse.sources = relevantFiles.map(f => f.fileName);
+            return parsedResponse as TutorResponse;
+        } catch (e) {
+            console.error("Failed to parse JSON response:", jsonStr, e);
+            throw new Error("The AI returned an invalid response. Please try again.");
+        }
+
+    } catch (error: any) {
+        console.error("Error analyzing files:", error);
+
+        // Try to extract error from various possible structures
+        let errorCode: number | undefined;
+        let errorStatus: string | undefined;
+        let errorMessage: string | undefined;
+
+        // Check direct error properties
+        if (error?.error) {
+            errorCode = error.error.code;
+            errorStatus = error.error.status;
+            errorMessage = error.error.message;
+        } else if (error?.code !== undefined) {
+            errorCode = error.code;
+            errorStatus = error.status;
             errorMessage = error.message;
         }
+
+        // Try parsing error.message if it's a JSON string (common with ApiError)
+        if (!errorCode && error?.message) {
+            try {
+                const parsed = JSON.parse(error.message);
+                if (parsed?.error) {
+                    errorCode = parsed.error.code;
+                    errorStatus = parsed.error.status;
+                    errorMessage = parsed.error.message;
+                }
+            } catch {
+                // Not JSON, use as-is
+                errorMessage = error.message;
+            }
+        }
+
+        // Handle quota exceeded (429)
+        if (errorCode === 429 || errorStatus === 'RESOURCE_EXHAUSTED') {
+            throw new Error(`API quota exceeded. Please check your Gemini API billing and quota limits at https://ai.dev/usage?tab=rate-limit.`);
+        }
+
+        // Handle authentication errors (401)
+        if (errorCode === 401 || errorStatus === 'UNAUTHENTICATED') {
+            throw new Error(`Invalid API key. Please check your GEMINI_API_KEY in .env.local.`);
+        }
+
+        // Use extracted message or fallback
+        if (errorMessage) {
+            throw new Error(`API Error: ${errorMessage}`);
+        }
+
+        if (error instanceof Error) {
+            throw new Error(`Failed to analyze files: ${error.message}`);
+        }
+        throw new Error("An unknown error occurred during analysis.");
     }
-    
-    // Handle quota exceeded (429)
-    if (errorCode === 429 || errorStatus === 'RESOURCE_EXHAUSTED') {
-        throw new Error(`API quota exceeded. Please check your Gemini API billing and quota limits at https://ai.dev/usage?tab=rate-limit.`);
-    }
-    
-    // Handle authentication errors (401)
-    if (errorCode === 401 || errorStatus === 'UNAUTHENTICATED') {
-        throw new Error(`Invalid API key. Please check your GEMINI_API_KEY in .env.local.`);
-    }
-    
-    // Use extracted message or fallback
-    if (errorMessage) {
-        throw new Error(`API Error: ${errorMessage}`);
-    }
-    
-    if (error instanceof Error) {
-        throw new Error(`Failed to analyze files: ${error.message}`);
-    }
-    throw new Error("An unknown error occurred during analysis.");
-  }
 };
