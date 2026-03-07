@@ -10,7 +10,7 @@
 
 ## 📖 Overview
 
-**AIucidate** is an intelligent, offline-capable academic study assistant designed to transform static PDF textbook chapters into interactive learning modules. By leveraging the power of **Google Gemini 2.5 Pro**, AIucidate provides students with AI-generated summaries, keyword definitions, and hierarchical mind maps for every chapter.
+**AIucidate** is an intelligent, offline-capable academic study assistant designed to transform static PDF textbook chapters into interactive learning modules. The application provides students with AI-generated summaries, keyword definitions, and hierarchical mind maps for every chapter.
 
 The application features role-based workflows:
 - **Administrators**: Upload and manage subject syllabuses by uploading PDF chapters. The app automatically analyzes the PDFs and generates interactive, structured study content.
@@ -28,7 +28,7 @@ The application features role-based workflows:
 
 - **Frontend**: React (v19), TypeScript, Vite
 - **Styling**: Tailwind CSS
-- **AI Integration**: Google Gen AI SDK (`@google/genai`) with the `gemini-2.5-pro` model
+- **AI Integration**: AI SDK Integrations
 - **PDF Processing**: `pdfjs-dist` (v4.4.168)
 - **Local Storage**: IndexedDB (wrapper via custom `dbService`)
 
@@ -37,7 +37,7 @@ The application features role-based workflows:
 ### Prerequisites
 
 - Node.js installed on your machine.
-- A valid Google Gemini API Key.
+- A valid API Key for the AI service.
 
 ### Installation & Setup
 
@@ -52,11 +52,10 @@ The application features role-based workflows:
    ```
 
 3. **Configure Environment Variables**:
-   Create a `.env.local` file in the root directory and add your Gemini API Key:
+   Create a `.env.local` file in the root directory and add your API Key:
    ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
+   GEMINI_API_KEY=your_api_key_here
    ```
-   *(Note: Vite maps `GEMINI_API_KEY` internally to `process.env.API_KEY` for the AI SDK).*
 
 4. **Run the Development Server**:
    ```bash
@@ -70,11 +69,20 @@ The application features role-based workflows:
 
 This project was built and conceptualized by:
 
-- **Muhammed Favas T P** - [LinkedIn Profile](https://www.linkedin.com/in/muhammed-favas-t-p)
-- **Roshan** - [LinkedIn Profile](https://www.linkedin.com/in/mroshan1/)
+<div style="display: flex; justify-content: start; gap: 20px;">
+  <div class="badge-base LI-profile-badge" data-locale="en_US" data-size="large" data-theme="dark" data-type="HORIZONTAL" data-vanity="muhammed-favas-t-p" data-version="v1">
+    <a class="badge-base__link LI-simple-link" href="https://ae.linkedin.com/in/muhammed-favas-t-p?trk=profile-badge">Muhammed Favas T P</a>
+  </div>
+
+  <div class="badge-base LI-profile-badge" data-locale="en_US" data-size="large" data-theme="dark" data-type="HORIZONTAL" data-vanity="mroshan1" data-version="v1">
+    <a class="badge-base__link LI-simple-link" href="https://www.linkedin.com/in/mroshan1?trk=profile-badge">Roshan M</a>
+  </div>
+</div>
+
+<script src="https://platform.linkedin.com/badges/js/profile.js" async defer type="text/javascript"></script>
 
 ---
 
 <div align="center">
-  <p>Built with ❤️ utilizing React and Google Gemini AI.</p>
+  <p>Built with ❤️ utilizing React.</p>
 </div>
