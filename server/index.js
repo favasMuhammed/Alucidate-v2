@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 
@@ -51,17 +51,8 @@ const otpSendLimiter = rateLimit({
 // --- In-memory OTP store: email -> { code, expiresAt, lastSent, failedAttempts, lockedUntil } ---
 const otpStore = new Map();
 
-// --- Zoho SMTP Transporter ---
-const transporter = nodemailer.createTransport({
-    host: 'smtp.zoho.in',
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    auth: {
-        user: process.env.ZOHO_EMAIL,
-        pass: process.env.ZOHO_APP_PASSWORD,
-    },
-});
+// --- Resend Client ---
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // --- Cleanup expired OTPs every 5 minutes ---
 setInterval(() => {
@@ -125,11 +116,10 @@ app.post('/api/otp/send', otpSendLimiter, async (req, res) => {
             console.log(`[DEV] OTP for ${email}: ${otpCode}`);
         }
 
-        const mailOptions = {
-            from: `"Alucidate" <${process.env.ZOHO_EMAIL}>`,
+        const { data, error } = await resend.emails.send({
+            from: 'Alucidate <onboarding@resend.dev>', // Resend default for testing, user should update to their domain later
             to: email,
             subject: 'Your Alucidate Verification Code',
-            text: `Your verification code is: ${otpCode}\n\nThis code expires in 5 minutes. Never share this code.`,
             html: `
                 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; background: #0d1117; border: 1px solid #1e2a42; border-radius: 12px; overflow: hidden;">
                     <div style="background: linear-gradient(135deg, #1a2744 0%, #0d1117 100%); padding: 32px 40px; border-bottom: 1px solid #1e2a42;">
@@ -144,9 +134,12 @@ app.post('/api/otp/send', otpSendLimiter, async (req, res) => {
                     </div>
                 </div>
             `,
-        };
+        });
 
-        await transporter.sendMail(mailOptions);
+        if (error) {
+            throw new Error(error.message);
+        }
+
         res.json({ success: true, message: 'Verification code sent.' });
     } catch (error) {
         console.error('Send OTP Error:', error?.message || error);
