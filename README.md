@@ -82,5 +82,6 @@ This project was built and conceptualized by:
 ---
 
 <div align="center">
-  <p>Built with ❤️ utilizing React.</p>
+  <p>Built with ❤️ by <a href="https://nayrix.com" target="_blank">Nayrix</a> utilizing React.</p>
 </div>
+
