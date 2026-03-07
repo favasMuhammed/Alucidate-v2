@@ -3,7 +3,6 @@
   <p align="center">
     <strong>An AI-powered academic tutor and interactive syllabus manager.</strong>
   </p>
-  <img width="800" alt="Alucidate App Preview" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
 ---
