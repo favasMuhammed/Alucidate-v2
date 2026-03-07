@@ -22,10 +22,14 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
 
 app.use(cors({
     origin: (origin, callback) => {
+        // Log origins in development/production to debug CORS issues on Render
+        if (origin) console.log(`[CORS] Request from origin: ${origin}`);
+
         // Allow requests with no origin (e.g., mobile apps, curl, health checks)
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (!origin || allowedOrigins.includes(origin) || origin.includes('localhost')) {
             callback(null, true);
         } else {
+            console.warn(`[CORS] Rejection: Origin ${origin} not in whitelist: ${allowedOrigins.join(', ')}`);
             callback(new Error(`CORS policy: Origin ${origin} not allowed.`));
         }
     },
@@ -69,9 +73,18 @@ setInterval(() => {
     }
 }, 5 * 60 * 1000);
 
+// --- Root Info ---
+app.get('/', (req, res) => {
+    res.send('Alucidate OTP Backend is active. Use /health for status.');
+});
+
 // --- Health Check ---
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'production'
+    });
 });
 
 // --- POST /api/otp/send ---
@@ -106,6 +119,11 @@ app.post('/api/otp/send', otpSendLimiter, async (req, res) => {
             failedAttempts: 0,
             lockedUntil: null,
         });
+
+        // OTP should NOT be logged in production for security
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`[DEV] OTP for ${email}: ${otpCode}`);
+        }
 
         const mailOptions = {
             from: `"Alucidate" <${process.env.ZOHO_EMAIL}>`,
