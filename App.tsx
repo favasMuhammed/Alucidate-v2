@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+﻿import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { analyzeFiles, findRelevantFiles, generateChapterDetails_Interactive } from './services/aiService';
-import { sendOTP, verifyOTP } from './services/otpService';
 import { TutorResponse, FileContent, ReferencedImage, CropCoordinates, MindMapNode, ConversationTurn, ChapterDetails, User, SubjectData, Keyword } from './types';
 import { useFadeUp } from './hooks/useScrollAnimation';
 import { cn } from './utils';
+import { AuthView } from './features/auth/AuthView';
+import { dbService } from './services/dbService';
 
 // @ts-ignore
 import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.mjs';
@@ -14,116 +15,6 @@ declare const PDFLib: any;
 if (typeof window !== 'undefined') {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.mjs';
 }
-
-const DB_NAME = 'SyllabusDB';
-const DB_VERSION = 5; // Incremented version for schema change
-const SUBJECTS_STORE = 'subjectsStore';
-const CHAPTERS_STORE = 'chaptersStore';
-const USERS_STORE = 'usersStore';
-
-// --- IndexedDB Service ---
-
-// FIX: Define an interface for dbService to resolve issues with 'this' type inference inside the object literal.
-interface IDBService {
-    openDB(): Promise<IDBDatabase>;
-    dbRequest<T>(storeName: string, mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest | IDBRequest<T[]>): Promise<T>;
-    getUser(email: string): Promise<User | undefined>;
-    addUser(user: User): Promise<IDBValidKey>;
-    getSubjectsByClass(className: string): Promise<SubjectData[]>;
-    getSubject(id: string): Promise<SubjectData | undefined>;
-    saveSubject(subject: SubjectData): Promise<IDBValidKey>;
-    getChapterDetails(id: string): Promise<ChapterDetails | undefined>;
-    saveChapterDetails(details: ChapterDetails): Promise<IDBValidKey>;
-    clearDB(): Promise<void>;
-    hasSubjects(): Promise<boolean>;
-}
-
-const dbService: IDBService = {
-    openDB(): Promise<IDBDatabase> {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-            request.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result;
-                if (!db.objectStoreNames.contains(SUBJECTS_STORE)) {
-                    const store = db.createObjectStore(SUBJECTS_STORE, { keyPath: 'id' });
-                    store.createIndex('classIndex', 'className', { unique: false });
-                }
-                if (!db.objectStoreNames.contains(CHAPTERS_STORE)) {
-                    db.createObjectStore(CHAPTERS_STORE, { keyPath: 'id' });
-                }
-                if (!db.objectStoreNames.contains(USERS_STORE)) {
-                    db.createObjectStore(USERS_STORE, { keyPath: 'email' });
-                }
-            };
-            request.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
-            request.onerror = (event) => reject((event.target as IDBOpenDBRequest).error);
-        });
-    },
-    // FIX: Refactored to be fully robust. It now waits for the transaction to complete before resolving, guaranteeing data is committed.
-    async dbRequest<T>(storeName: string, mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest | IDBRequest<T[]>): Promise<T> {
-        const db = await this.openDB();
-        return new Promise<T>((resolve, reject) => {
-            const transaction = db.transaction(storeName, mode);
-            const store = transaction.objectStore(storeName);
-            const request = action(store);
-
-            let result: T;
-
-            request.onsuccess = () => {
-                result = request.result;
-            };
-
-            request.onerror = () => {
-                reject(request.error);
-            };
-
-            transaction.oncomplete = () => {
-                resolve(result);
-            };
-
-            transaction.onerror = () => {
-                reject(transaction.error);
-            };
-        });
-    },
-    getUser(email: string): Promise<User | undefined> {
-        return (this as IDBService).dbRequest<User | undefined>(USERS_STORE, 'readonly', store => store.get(email));
-    },
-    addUser(user: User): Promise<IDBValidKey> {
-        return (this as IDBService).dbRequest<IDBValidKey>(USERS_STORE, 'readwrite', store => store.put(user));
-    },
-    // FIX: Refactored to use the new robust `dbRequest` method for consistency and reliability.
-    async getSubjectsByClass(className: string): Promise<SubjectData[]> {
-        const results = await (this as IDBService).dbRequest<SubjectData[]>(SUBJECTS_STORE, 'readonly', store => {
-            const index = store.index('classIndex');
-            return index.getAll(className);
-        });
-        return results || [];
-    },
-    getSubject(id: string): Promise<SubjectData | undefined> {
-        return (this as IDBService).dbRequest<SubjectData | undefined>(SUBJECTS_STORE, 'readonly', store => store.get(id));
-    },
-    saveSubject(subject: SubjectData): Promise<IDBValidKey> {
-        return (this as IDBService).dbRequest<IDBValidKey>(SUBJECTS_STORE, 'readwrite', store => store.put(subject));
-    },
-    getChapterDetails(id: string): Promise<ChapterDetails | undefined> {
-        return (this as IDBService).dbRequest<ChapterDetails | undefined>(CHAPTERS_STORE, 'readonly', store => store.get(id));
-    },
-    saveChapterDetails(details: ChapterDetails): Promise<IDBValidKey> {
-        return (this as IDBService).dbRequest<IDBValidKey>(CHAPTERS_STORE, 'readwrite', store => store.put(details));
-    },
-    clearDB(): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            const req = indexedDB.deleteDatabase(DB_NAME);
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
-        });
-    },
-    hasSubjects(): Promise<boolean> {
-        return (this as IDBService).dbRequest<number>(SUBJECTS_STORE, 'readonly', store => store.count()).then(count => count > 0);
-    },
-};
-
 
 // --- Binary Data Helpers ---
 const base64ToUint8Array = (base64: string): Uint8Array => {
@@ -202,21 +93,10 @@ export default function App() {
                     return;
                 }
             }
-
-            // For testing convenience, automatically log in a default user.
-            const defaultUser: User = { email: 'test@example.com', name: 'Test User', className: 'Class 10' };
-            let user = await dbService.getUser(defaultUser.email);
-            if (!user) {
-                await dbService.addUser(defaultUser);
-                user = defaultUser;
-            }
-            localStorage.setItem('currentUserEmail', user.email);
-            setCurrentUser(user);
-            const hasSubjects = await dbService.hasSubjects();
-            setAppState(hasSubjects ? 'dashboard' : 'admin');
-
+            // No valid session â€” show auth screen
+            setAppState('auth');
         } catch (error) {
-            console.error("Error checking auth status:", error);
+            console.error('Auth check failed:', error);
             localStorage.removeItem('currentUserEmail');
             setAppState('auth');
         }
@@ -226,17 +106,17 @@ export default function App() {
         checkAuthStatus();
     }, [checkAuthStatus]);
 
-    const handleLogout = () => {
+    const handleLogout = useCallback(() => {
         localStorage.removeItem('currentUserEmail');
         setCurrentUser(null);
         setAppState('auth');
-    };
+    }, []);
 
-    const handleLogin = (user: User) => {
+    const handleLogin = useCallback((user: User) => {
         localStorage.setItem('currentUserEmail', user.email);
         setCurrentUser(user);
         checkAuthStatus();
-    };
+    }, [checkAuthStatus]);
 
     switch (appState) {
         case 'loading': return <LoadingSpinner fullScreen />;
@@ -247,241 +127,6 @@ export default function App() {
     }
 }
 
-// --- Authentication View ---
-const AuthView: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) => {
-    const [isLogin, setIsLogin] = useState(true);
-    const [step, setStep] = useState<'email' | 'otp'>('email');
-
-    // Form fields
-    const [email, setEmail] = useState('');
-    const [signupName, setSignupName] = useState('');
-    const [signupClass, setSignupClass] = useState('');
-
-    // OTP fields
-    const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
-    const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [cooldown, setCooldown] = useState(0);
-
-    const containerRef = useRef<HTMLDivElement>(null);
-    useFadeUp(containerRef, { stagger: 0.1 });
-
-    useEffect(() => {
-        if (cooldown > 0) {
-            const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
-            return () => clearTimeout(timer);
-        }
-    }, [cooldown]);
-
-    const handleSendOTP = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-        setError('');
-
-        if (!isLogin && (!signupName || !signupClass || !email)) {
-            setError('Please fill out all fields.');
-            return;
-        }
-
-        setIsLoading(true);
-        try {
-            // Check if user exists for login, or doesn't exist for signup
-            const existingUser = await dbService.getUser(email);
-            if (isLogin && !existingUser) {
-                setError('No account found with that email.');
-                setIsLoading(false);
-                return;
-            }
-            if (!isLogin && existingUser) {
-                setError('An account with this email already exists.');
-                setIsLoading(false);
-                return;
-            }
-
-            // Send actual OTP
-            await sendOTP(email);
-            setStep('otp');
-            setCooldown(30); // 30s cooldown for resend
-        } catch (err: any) {
-            setError(err.message || 'Failed to send OTP.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleVerifyOTP = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const code = otpCode.join('');
-        if (code.length !== 6) {
-            setError('Please enter a 6-digit code.');
-            return;
-        }
-
-        setError('');
-        setIsLoading(true);
-        try {
-            await verifyOTP(email, code);
-
-            // Login or Create Account
-            if (isLogin) {
-                const user = await dbService.getUser(email);
-                if (user) onLogin(user);
-            } else {
-                const newUser: User = { name: signupName, className: signupClass, email };
-                await dbService.addUser(newUser);
-                onLogin(newUser);
-            }
-        } catch (err: any) {
-            setError(err.message || 'Invalid OTP code.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleOtpChange = (index: number, val: string) => {
-        if (val.length > 1) {
-            // Handle paste
-            const pasted = val.replace(/\D/g, '').slice(0, 6).split('');
-            const newOtp = [...otpCode];
-            pasted.forEach((char, i) => {
-                if (index + i < 6) newOtp[index + i] = char;
-            });
-            setOtpCode(newOtp);
-            // Focus last filled
-            const nextIndex = Math.min(index + pasted.length, 5);
-            otpRefs.current[nextIndex]?.focus();
-            return;
-        }
-
-        // Normal typing
-        const newOtp = [...otpCode];
-        newOtp[index] = val.replace(/\D/g, '');
-        setOtpCode(newOtp);
-
-        if (val && index < 5) {
-            otpRefs.current[index + 1]?.focus();
-        }
-    };
-
-    const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-        if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
-            otpRefs.current[index - 1]?.focus();
-        }
-    };
-
-    return (
-        <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 bg-background overflow-hidden relative">
-            {/* Background ambient accents */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-brand/5 blur-[120px]"></div>
-                <div className="absolute bottom-[0%] right-[0%] w-[40%] h-[40%] rounded-full bg-info/5 blur-[100px]"></div>
-            </div>
-
-            <div ref={containerRef} className="max-w-md w-full relative z-10">
-                <div data-animate className="text-center mb-10">
-                    <AlucidateLogo />
-                    <p className="mt-3 text-sm text-foreground/80 tracking-wide">
-                        {step === 'email'
-                            ? (isLogin ? "Welcome back! Please log in." : "Create your student account.")
-                            : "Enter the 6-digit code sent to your email."}
-                    </p>
-                </div>
-
-                <div data-animate className="bg-elevated/80 backdrop-blur-2xl p-8 sm:p-10 rounded-[var(--radius-2xl)] border border-border shadow-2xl relative overflow-hidden transition-all duration-500">
-                    {/* decorative blur inside card */}
-                    <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand/10 rounded-full blur-3xl pointer-events-none"></div>
-
-                    {step === 'email' ? (
-                        <form onSubmit={handleSendOTP} className="space-y-5 relative z-10">
-                            {!isLogin && (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-semibold tracking-wide text-foreground/70 mb-2 ml-1 uppercase">Full Name</label>
-                                        <input type="text" value={signupName} onChange={e => setSignupName(e.target.value)} placeholder="John Doe" required
-                                            className="w-full bg-background/50 border border-border rounded-xl px-4 py-3.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-all placeholder:text-foreground/80" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold tracking-wide text-foreground/70 mb-2 ml-1 uppercase">Class</label>
-                                        <input type="text" value={signupClass} onChange={e => setSignupClass(e.target.value)} placeholder="e.g. Class 10" required
-                                            className="w-full bg-background/50 border border-border rounded-xl px-4 py-3.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-all placeholder:text-foreground/80" />
-                                    </div>
-                                </>
-                            )}
-                            <div>
-                                <label className="block text-xs font-semibold tracking-wide text-foreground/70 mb-2 ml-1 uppercase">Email Address</label>
-                                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="hello@alucidate.ai" required
-                                    className="w-full bg-background/50 border border-border rounded-xl px-4 py-3.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-all placeholder:text-foreground/80" />
-                            </div>
-
-                            {error && <p className="text-error text-xs font-medium ml-1 animate-pulse">{error}</p>}
-
-                            <button type="submit" disabled={isLoading}
-                                className={cn("w-full font-semibold py-3.5 px-6 rounded-xl shadow-[0_0_20px_rgba(var(--color-brand),0.3)] transition-all mt-4 flex justify-center",
-                                    isLogin ? "bg-brand text-white hover:bg-brand-hover hover:shadow-[0_0_25px_rgba(var(--color-brand),0.5)]" : "bg-foreground text-background hover:bg-foreground/90",
-                                    isLoading && "opacity-70 cursor-not-allowed"
-                                )}>
-                                {isLoading ? <span className="animate-pulse">Sending code...</span> : (isLogin ? "Send Login Code" : "Send Signup Code")}
-                            </button>
-                        </form>
-                    ) : (
-                        <form onSubmit={handleVerifyOTP} className="space-y-6 relative z-10 text-center">
-                            <p className="text-sm font-medium text-foreground/80">{email}</p>
-                            <div className="flex justify-center gap-2 sm:gap-3">
-                                {otpCode.map((digit, index) => (
-                                    <input
-                                        key={index}
-                                        ref={el => { otpRefs.current[index] = el; }}
-                                        type="text"
-                                        inputMode="numeric"
-                                        maxLength={1}
-                                        value={digit}
-                                        onChange={e => handleOtpChange(index, e.target.value)}
-                                        onKeyDown={e => handleOtpKeyDown(index, e)}
-                                        className="w-10 h-12 sm:w-12 sm:h-14 text-center text-xl font-bold bg-background/50 border border-border rounded-lg focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-all"
-                                    />
-                                ))}
-                            </div>
-
-                            {error && <p className="text-error text-xs font-medium animate-pulse">{error}</p>}
-
-                            <button type="submit" disabled={isLoading}
-                                className="w-full bg-brand text-white font-semibold py-3.5 px-6 rounded-xl shadow-[0_0_20px_rgba(var(--color-brand),0.3)] hover:bg-brand-hover hover:-translate-y-0.5 active:scale-95 transition-all flex justify-center">
-                                {isLoading ? <span className="animate-pulse">Verifying...</span> : "Verify & Log In"}
-                            </button>
-
-                            <div className="pt-2 flex justify-center items-center">
-                                <button
-                                    type="button"
-                                    onClick={() => handleSendOTP()}
-                                    disabled={cooldown > 0 || isLoading}
-                                    className="text-xs font-medium text-foreground/60 hover:text-brand disabled:opacity-50 transition-colors"
-                                >
-                                    {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend Code'}
-                                </button>
-                                <span className="mx-2 text-foreground/30">|</span>
-                                <button type="button" onClick={() => { setStep('email'); setOtpCode(['', '', '', '', '', '']); setError(''); }} className="text-xs font-medium text-foreground/60 hover:text-brand transition-colors">
-                                    Change Email
-                                </button>
-                            </div>
-                        </form>
-                    )}
-
-                    {step === 'email' && (
-                        <div data-animate className="mt-8 text-center relative z-10 border-t border-border/50 pt-6">
-                            <p className="text-sm text-foreground/80">
-                                {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
-                                <button type="button" onClick={() => { setIsLogin(!isLogin); setError(''); }} className="font-semibold text-foreground hover:text-brand transition-colors">
-                                    {isLogin ? 'Sign up' : 'Log in'}
-                                </button>
-                            </p>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
 
 // --- Data Processing Helper ---
 const addFileNameToMindMapNode = (node: MindMapNode, fileName: string): void => {

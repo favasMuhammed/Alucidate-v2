@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
@@ -9,25 +11,55 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors({ origin: process.env.ALLOWED_ORIGINS || 'http://localhost:5173' }));
-app.use(express.json());
+// --- Security Headers (14 headers in one line) ---
+app.use(helmet());
 
-// In-memory OTP store map: email -> { code, expiresAt, lastSent }
+// --- CORS Whitelist ---
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (e.g., mobile apps, curl, health checks)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error(`CORS policy: Origin ${origin} not allowed.`));
+        }
+    },
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type'],
+}));
+
+app.use(express.json({ limit: '10kb' })); // Limit body size to prevent large payload attacks
+
+// --- Rate Limiter: max 5 OTP sends per 15 minutes per IP ---
+const otpSendLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many OTP requests from this IP. Please wait 15 minutes.' },
+});
+
+// --- In-memory OTP store: email -> { code, expiresAt, lastSent, failedAttempts, lockedUntil } ---
 const otpStore = new Map();
 
-// Zoho SMTP Transporter
+// --- Zoho SMTP Transporter ---
 const transporter = nodemailer.createTransport({
     host: 'smtp.zoho.in',
-    port: 587, // STARTTLS
+    port: 587,
     secure: false,
+    requireTLS: true,
     auth: {
         user: process.env.ZOHO_EMAIL,
         pass: process.env.ZOHO_APP_PASSWORD,
     },
 });
 
-// Clean up expired OTPs periodically (every 5 mins)
+// --- Cleanup expired OTPs every 5 minutes ---
 setInterval(() => {
     const now = Date.now();
     for (const [email, data] of otpStore.entries()) {
@@ -37,88 +69,118 @@ setInterval(() => {
     }
 }, 5 * 60 * 1000);
 
+// --- Health Check ---
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', message: 'OTP Server running' });
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.post('/api/otp/send', async (req, res) => {
+// --- POST /api/otp/send ---
+app.post('/api/otp/send', otpSendLimiter, async (req, res) => {
     try {
-        const { email } = req.body;
-        if (!email || !/\S+@\S+\.\S+/.test(email)) {
-            return res.status(400).json({ error: 'Valid email is required.' });
+        const rawEmail = req.body?.email;
+        if (!rawEmail || typeof rawEmail !== 'string') {
+            return res.status(400).json({ error: 'A valid email address is required.' });
+        }
+
+        const email = rawEmail.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format.' });
         }
 
         const now = Date.now();
         const existingOTP = otpStore.get(email);
 
-        // Optional: 30-second cooldown on resending
+        // 30-second resend cooldown
         if (existingOTP && (now - existingOTP.lastSent) < 30 * 1000) {
-            return res.status(429).json({ error: 'Please wait before requesting another OTP.' });
+            const waitSeconds = Math.ceil((30 * 1000 - (now - existingOTP.lastSent)) / 1000);
+            return res.status(429).json({ error: `Please wait ${waitSeconds} seconds before requesting another OTP.` });
         }
 
-        // Generate 6-digit numeric OTP
+        // Generate cryptographically secure 6-digit OTP
         const otpCode = crypto.randomInt(100000, 999999).toString();
 
-        // Save to store (expires in 5 minutes)
         otpStore.set(email, {
             code: otpCode,
             expiresAt: now + 5 * 60 * 1000,
-            lastSent: now
+            lastSent: now,
+            failedAttempts: 0,
+            lockedUntil: null,
         });
 
-        // Send email
         const mailOptions = {
-            from: `"Alucidate App" <${process.env.ZOHO_EMAIL}>`,
+            from: `"Alucidate" <${process.env.ZOHO_EMAIL}>`,
             to: email,
-            subject: 'Your Alucidate Login Verification Code',
-            text: `Your login verification code is: ${otpCode}\n\nThis code will expire in 5 minutes. Do not share this code with anyone.`,
+            subject: 'Your Alucidate Verification Code',
+            text: `Your verification code is: ${otpCode}\n\nThis code expires in 5 minutes. Never share this code.`,
             html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-                    <h2 style="color: #1e3a8a;">Alucidate Login Verification</h2>
-                    <p style="color: #334155; font-size: 16px;">Here is your secure verification code:</p>
-                    <div style="background-color: #f1f5f9; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
-                        <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #0f172a;">${otpCode}</span>
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; background: #0d1117; border: 1px solid #1e2a42; border-radius: 12px; overflow: hidden;">
+                    <div style="background: linear-gradient(135deg, #1a2744 0%, #0d1117 100%); padding: 32px 40px; border-bottom: 1px solid #1e2a42;">
+                        <h1 style="margin: 0; font-size: 22px; color: #e2e8f0; font-weight: 600; letter-spacing: -0.02em;">AI<span style="font-weight: 300;">ucidate</span></h1>
                     </div>
-                    <p style="color: #64748b; font-size: 14px;">This code will expire in 5 minutes. If you did not request this, please ignore this email.</p>
+                    <div style="padding: 40px;">
+                        <p style="margin: 0 0 24px; color: #94a3b8; font-size: 15px; line-height: 1.6;">Here is your secure sign-in code:</p>
+                        <div style="background: #1a2744; border: 1px solid #2d4a8a; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 28px;">
+                            <span style="font-size: 40px; font-weight: 700; letter-spacing: 8px; color: #60a5fa; font-family: 'Courier New', monospace;">${otpCode}</span>
+                        </div>
+                        <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.6;">This code expires in <strong style="color: #94a3b8;">5 minutes</strong>. If you did not request this, you can safely ignore this email.</p>
+                    </div>
                 </div>
-            `
+            `,
         };
 
         await transporter.sendMail(mailOptions);
-        res.json({ success: true, message: 'OTP sent to email.' });
+        res.json({ success: true, message: 'Verification code sent.' });
     } catch (error) {
-        console.error('Send OTP Error:', error);
-        res.status(500).json({ error: 'Failed to send OTP email. Please try again later.' });
+        console.error('Send OTP Error:', error?.message || error);
+        res.status(500).json({ error: 'Failed to send verification email. Please try again.' });
     }
 });
 
+// --- POST /api/otp/verify ---
 app.post('/api/otp/verify', (req, res) => {
-    const { email, code } = req.body;
+    const rawEmail = req.body?.email;
+    const code = req.body?.code;
 
-    if (!email || !code) {
-        return res.status(400).json({ error: 'Email and OTP code are required.' });
+    if (!rawEmail || !code) {
+        return res.status(400).json({ error: 'Email and code are required.' });
     }
 
+    const email = rawEmail.trim().toLowerCase();
     const storedData = otpStore.get(email);
 
     if (!storedData) {
-        return res.status(400).json({ error: 'No OTP found for this email, or it has expired.' });
+        return res.status(400).json({ error: 'No active verification code for this email.' });
+    }
+
+    // Check brute-force lockout
+    if (storedData.lockedUntil && Date.now() < storedData.lockedUntil) {
+        const waitMinutes = Math.ceil((storedData.lockedUntil - Date.now()) / 60000);
+        return res.status(429).json({ error: `Too many failed attempts. Try again in ${waitMinutes} minute(s).` });
     }
 
     if (Date.now() > storedData.expiresAt) {
         otpStore.delete(email);
-        return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+        return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
     }
 
-    if (storedData.code !== code) {
-        return res.status(400).json({ error: 'Invalid OTP code.' });
+    if (storedData.code !== String(code).trim()) {
+        storedData.failedAttempts = (storedData.failedAttempts || 0) + 1;
+
+        // Lock out after 5 failed attempts for 5 minutes
+        if (storedData.failedAttempts >= 5) {
+            storedData.lockedUntil = Date.now() + 5 * 60 * 1000;
+            return res.status(429).json({ error: 'Too many failed attempts. This code is locked for 5 minutes.' });
+        }
+
+        const remaining = 5 - storedData.failedAttempts;
+        return res.status(400).json({ error: `Invalid code. ${remaining} attempt(s) remaining.` });
     }
 
-    // Success! Clear the OTP so it can't be reused immediately
+    // ✅ Verified — clear the OTP so it cannot be reused
     otpStore.delete(email);
-    res.json({ success: true, message: 'OTP verified successfully.' });
+    res.json({ success: true, message: 'Verification successful.' });
 });
 
 app.listen(PORT, () => {
-    console.log(`OTP Express Server running on port ${PORT}`);
+    console.log(`✅ Alucidate OTP Server running on port ${PORT}`);
 });
