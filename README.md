@@ -68,17 +68,14 @@ The application features role-based workflows:
 
 This project was built and conceptualized by:
 
-<div style="display: flex; justify-content: start; gap: 20px;">
-  <div class="badge-base LI-profile-badge" data-locale="en_US" data-size="large" data-theme="dark" data-type="HORIZONTAL" data-vanity="muhammed-favas-t-p" data-version="v1">
-    <a class="badge-base__link LI-simple-link" href="https://ae.linkedin.com/in/muhammed-favas-t-p?trk=profile-badge">Muhammed Favas T P</a>
-  </div>
-
-  <div class="badge-base LI-profile-badge" data-locale="en_US" data-size="large" data-theme="dark" data-type="HORIZONTAL" data-vanity="mroshan1" data-version="v1">
-    <a class="badge-base__link LI-simple-link" href="https://www.linkedin.com/in/mroshan1?trk=profile-badge">Roshan M</a>
-  </div>
+<div style="display: flex; justify-content: start; gap: 15px; margin-top: 10px;">
+  <a href="https://ae.linkedin.com/in/muhammed-favas-t-p?trk=profile-badge">
+    <img src="https://img.shields.io/badge/Muhammed_Favas_T_P-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="Muhammed Favas T P LinkedIn" />
+  </a>
+  <a href="https://www.linkedin.com/in/mroshan1?trk=profile-badge">
+    <img src="https://img.shields.io/badge/Roshan_M-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="Roshan M LinkedIn" />
+  </a>
 </div>
-
-<script src="https://platform.linkedin.com/badges/js/profile.js" async defer type="text/javascript"></script>
 
 ---
 
