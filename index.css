@@ -63,7 +63,9 @@
   body {
     margin: 0;
     min-height: 100vh;
-    @apply bg-void text-ink font-sans;
+    background-color: var(--color-void);
+    color: var(--color-ink);
+    font-family: 'Geist', sans-serif;
   }
 
   h1,
@@ -133,10 +135,11 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-border rounded-full;
+  background-color: var(--color-border);
+  border-radius: 9999px;
   border: 2px solid var(--color-surface);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-ink-3;
+  background-color: var(--color-ink-3);
 }

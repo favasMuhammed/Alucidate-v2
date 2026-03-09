@@ -1,34 +1,91 @@
-import React from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import React, { lazy } from 'react';
+import { createBrowserRouter, Navigate, useNavigate } from 'react-router-dom';
 import { AppShell } from './layouts/AppShell';
 import { AuthView } from './features/auth/AuthView';
+import { useAuth } from './hooks/useAuth';
+import { LoadingSpinner } from './components/ui/LoadingSpinner';
 
-// Lazy load feature views to ensure FAANG-level code splitting
-const lazyAdmin = () => import('./features/admin/AdminView');
-const lazyDashboard = () => import('./features/dashboard/DashboardView');
-const lazyChapter = () => import('./features/chapter/ChapterView');
+// ── Lazy loaded views ──────────────────────────────────────────────────────
+const DashboardView = lazy(() => import('./features/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
+const AdminView = lazy(() => import('./features/admin/AdminView').then(m => ({ default: m.AdminView })));
+const SubjectHomeView = lazy(() => import('./features/dashboard/SubjectHomeView').then(m => ({ default: m.SubjectHomeView })));
+const ChapterView = lazy(() => import('./features/chapter/ChapterView').then(m => ({ default: m.ChapterView })));
 
-// For now, placeholder components until we migrate the views
-function Placeholder({ name }: { name: string }) {
-    return <div className="p-8 text-ink">Mounting {name}...</div>;
+// ── Loading Fallback ───────────────────────────────────────────────────────
+const PageLoader = () => (
+    <div className="flex-1 flex items-center justify-center h-full min-h-[60vh]">
+        <LoadingSpinner label="Loading..." />
+    </div>
+);
+
+// ── Auth Guard ─────────────────────────────────────────────────────────────
+function AuthGuard({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
+    const { user, loading } = useAuth();
+    const navigate = useNavigate();
+
+    if (loading) return <PageLoader />;
+    if (!user) {
+        return <Navigate to="/auth" replace />;
+    }
+    if (adminOnly && user.role !== 'admin') {
+        return <Navigate to="/dashboard" replace />;
+    }
+    return <>{children}</>;
 }
 
+// ── Router ─────────────────────────────────────────────────────────────────
 export const router = createBrowserRouter([
     {
         path: '/',
         element: <AppShell />,
         children: [
             { index: true, element: <Navigate to="/dashboard" replace /> },
-            { path: 'dashboard', element: <Placeholder name="Dashboard" /> },
-            { path: 'subject/:subjectId', element: <Placeholder name="Subject Home" /> },
-            { path: 'subject/:subjectId/chapter/:chapterId', element: <Placeholder name="Chapter View" /> },
-            { path: 'admin', element: <Placeholder name="Admin" /> },
+            {
+                path: 'dashboard',
+                element: (
+                    <AuthGuard>
+                        <React.Suspense fallback={<PageLoader />}>
+                            <DashboardView />
+                        </React.Suspense>
+                    </AuthGuard>
+                ),
+            },
+            {
+                path: 'subject/:subjectId',
+                element: (
+                    <AuthGuard>
+                        <React.Suspense fallback={<PageLoader />}>
+                            <SubjectHomeView />
+                        </React.Suspense>
+                    </AuthGuard>
+                ),
+            },
+            {
+                path: 'subject/:subjectId/chapter/:chapterId',
+                element: (
+                    <AuthGuard>
+                        <React.Suspense fallback={<PageLoader />}>
+                            <ChapterView />
+                        </React.Suspense>
+                    </AuthGuard>
+                ),
+            },
+            {
+                path: 'admin',
+                element: (
+                    <AuthGuard adminOnly>
+                        <React.Suspense fallback={<PageLoader />}>
+                            <AdminView />
+                        </React.Suspense>
+                    </AuthGuard>
+                ),
+            },
         ],
     },
     {
         path: '/auth',
         element: (
-            <React.Suspense fallback={<div className="h-screen w-full bg-void flex items-center justify-center text-ink"><div className="animate-spin w-8 h-8 rounded-full border-t-2 border-brand" /></div>}>
+            <React.Suspense fallback={<div className="h-screen w-full bg-void flex items-center justify-center"><div className="animate-spin w-8 h-8 rounded-full border-t-2 border-brand" /></div>}>
                 <AuthView onLogin={(user) => {
                     localStorage.setItem('currentUserEmail', user.email);
                     window.location.href = user.role === 'admin' ? '/admin' : '/dashboard';

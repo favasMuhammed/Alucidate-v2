@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CommandPalette } from '@/components/ui/CommandPalette';
 import { useAppStore } from '@/store/useAppStore';
+import { useAuth } from '@/hooks/useAuth';
 
 const pageVariants = {
     initial: { opacity: 0, y: 16 },
@@ -13,6 +14,7 @@ const pageVariants = {
 export const AppShell: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { user, logout } = useAuth();
 
     const handleLogoClick = () => {
         navigate('/dashboard');
@@ -53,9 +55,22 @@ export const AppShell: React.FC = () => {
                             <kbd className="hidden lg:inline-block px-1.5 py-0.5 rounded border border-border-subtle bg-void text-[10px] font-mono group-hover:border-border transition-colors">⌘K</kbd>
                         </button>
 
-                        <div className="w-px h-5 bg-border mx-1" />                      <button className="w-8 h-8 rounded-full bg-raised border border-border flex items-center justify-center text-sm font-bold text-ink hover:glow-brand transition-all">
-                            T
-                        </button>
+                        <div className="w-px h-5 bg-border mx-1" />
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-raised transition-colors group cursor-default">
+                                <div className="w-7 h-7 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-xs font-bold text-brand">
+                                    {(user?.name || user?.email || 'U')[0].toUpperCase()}
+                                </div>
+                                <span className="hidden md:block text-xs text-ink-2 max-w-[100px] truncate">{user?.name || user?.email}</span>
+                            </div>
+                            <button
+                                onClick={logout}
+                                title="Logout"
+                                className="w-7 h-7 flex items-center justify-center rounded-md text-ink-3 hover:text-danger hover:bg-danger/10 transition-all"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </header>
