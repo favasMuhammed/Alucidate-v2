@@ -121,11 +121,17 @@ export default function App() {
         setAppState('auth');
     }, []);
 
-    const handleLogin = useCallback((user: User) => {
+    const handleLogin = useCallback(async (user: User) => {
         localStorage.setItem('currentUserEmail', user.email);
         setCurrentUser(user);
-        checkAuthStatus();
-    }, [checkAuthStatus]);
+        // Directly check for subjects and set state — avoids a redundant auth re-check
+        try {
+            const hasSubjects = await dbService.hasSubjects();
+            setAppState(hasSubjects ? 'dashboard' : 'admin');
+        } catch {
+            setAppState('admin');
+        }
+    }, []);
 
     switch (appState) {
         case 'loading': return <LoadingSpinner fullScreen />;

@@ -87,16 +87,29 @@ export const dbService: IDBService = {
     saveChapterDetails(details: ChapterDetails) {
         return (this as IDBService).dbRequest<IDBValidKey>(CHAPTERS_STORE, 'readwrite', store => store.put(details));
     },
-    async getChaptersBySubject(subjectId: string) {
-        const results = await (this as IDBService).dbRequest<ChapterDetails[]>(CHAPTERS_STORE, 'readonly', store => {
-            return store.openCursor();
+    async getChaptersBySubject(subjectId: string): Promise<ChapterDetails[]> {
+        const db = await (this as IDBService).openDB();
+        return new Promise<ChapterDetails[]>((resolve, reject) => {
+            const transaction = db.transaction(CHAPTERS_STORE, 'readonly');
+            const store = transaction.objectStore(CHAPTERS_STORE);
+            const request = store.openCursor();
+            const results: ChapterDetails[] = [];
+            request.onsuccess = (event) => {
+                const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+                if (cursor) {
+                    if ((cursor.value as ChapterDetails).subjectId === subjectId) {
+                        results.push(cursor.value);
+                    }
+                    cursor.continue();
+                } else {
+                    results.sort((a, b) =>
+                        a.chapterId.localeCompare(b.chapterId, undefined, { numeric: true, sensitivity: 'base' })
+                    );
+                    resolve(results);
+                }
+            };
+            request.onerror = () => reject(request.error);
         });
-
-        // Manual filter and sort as we don't have a specific index on subjectId yet
-        const filtered = results ? (results as any).filter((c: ChapterDetails) => c.subjectId === subjectId) : [];
-        return filtered.sort((a: any, b: any) =>
-            a.chapterId.localeCompare(b.chapterId, undefined, { numeric: true, sensitivity: 'base' })
-        );
     },
     clearDB() {
         return new Promise<void>((resolve, reject) => {

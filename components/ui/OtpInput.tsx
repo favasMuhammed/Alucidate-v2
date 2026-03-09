@@ -82,7 +82,7 @@ export const OtpInput: React.FC<OtpInputProps> = ({
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
-                    maxLength={6} // Allow paste
+                    maxLength={1}
                     value={value[index] ?? ''}
                     onChange={e => handleChange(index, e.target.value)}
                     onKeyDown={e => handleKeyDown(index, e)}
