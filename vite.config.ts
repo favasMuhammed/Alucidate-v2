@@ -23,9 +23,9 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules')) {
             if (id.includes('@google/genai')) return 'genai';
-            if (id.includes('gsap')) return 'gsap';
-            if (id.includes('react-dom')) return 'react-dom';
-            if (id.includes('react')) return 'react';
+            if (id.includes('framer-motion') || id.includes('gsap')) return 'animations';
+            if (id.includes('react-router') || id.includes('@tanstack') || id.includes('zustand')) return 'core-vendor';
+            if (id.includes('katex') || id.includes('remark') || id.includes('rehype') || id.includes('markdown')) return 'markdown-vendor';
             return 'vendor';
           }
         },
