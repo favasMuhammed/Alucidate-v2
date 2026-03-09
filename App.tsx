@@ -124,12 +124,16 @@ export default function App() {
     const handleLogin = useCallback(async (user: User) => {
         localStorage.setItem('currentUserEmail', user.email);
         setCurrentUser(user);
-        // Directly check for subjects and set state — avoids a redundant auth re-check
-        try {
-            const hasSubjects = await dbService.hasSubjects();
-            setAppState(hasSubjects ? 'dashboard' : 'admin');
-        } catch {
+        // Admins always land on AdminView; students go to dashboard if they have subjects
+        if (user.role === 'admin') {
             setAppState('admin');
+        } else {
+            try {
+                const hasSubjects = await dbService.hasSubjects(user.className);
+                setAppState(hasSubjects ? 'dashboard' : 'admin');
+            } catch {
+                setAppState('admin');
+            }
         }
     }, []);
 

@@ -26,6 +26,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
     const [email, setEmail] = useState('');
     const [signupName, setSignupName] = useState('');
     const [signupClass, setSignupClass] = useState('');
+    const [signupRole, setSignupRole] = useState<'student' | 'admin'>('student');
     const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
 
     const [isLoading, setIsLoading] = useState(false);
@@ -138,6 +139,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                     name: signupName.trim(),
                     className: signupClass.trim(),
                     email: email.trim().toLowerCase(),
+                    role: signupRole,
                 };
                 await dbService.addUser(newUser);
                 onLogin(newUser);
@@ -177,7 +179,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                     <AlucidateLogo />
                     <p className="mt-3 text-sm text-foreground/60 tracking-wide">
                         {step === 'email'
-                            ? (isLogin ? 'Welcome back. Enter your email to continue.' : 'Create your student account.')
+                            ? (isLogin ? 'Welcome back. Enter your email to continue.' : 'Create your account.')
                             : `Enter the 6-digit code sent to ${email}`}
                     </p>
                 </div>
@@ -213,6 +215,27 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                                         placeholder="e.g. Class 12 / Year 2"
                                         required
                                     />
+                                    {/* Role selector */}
+                                    <div>
+                                        <p className="text-xs font-medium text-foreground/60 mb-2">Account Type</p>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {(['student', 'admin'] as const).map(r => (
+                                                <button
+                                                    key={r}
+                                                    type="button"
+                                                    onClick={() => setSignupRole(r)}
+                                                    className={cn(
+                                                        'py-2 rounded-lg border text-sm font-medium capitalize transition-all',
+                                                        signupRole === r
+                                                            ? 'border-brand bg-brand/10 text-brand'
+                                                            : 'border-border bg-elevated/50 text-foreground/50 hover:border-brand/40'
+                                                    )}
+                                                >
+                                                    {r === 'admin' ? '👩‍🏫 Admin' : '🎓 Student'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </>
                             )}
 

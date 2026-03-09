@@ -1,124 +1,226 @@
 /**
  * dbService.ts
- * Centralized IndexedDB service for the Alucidate application.
- * Extracted from App.tsx for clean separation of concerns.
+ * Hybrid data service for the Alucidate application.
+ *
+ * Structured data (users, subjects, chapters, conversations) → Supabase PostgreSQL
+ * PDF binary cache (large Base64 files) → IndexedDB (device-local, for performance)
  */
 import { User, SubjectData, ChapterDetails } from '@/types';
+import { supabase } from './supabaseClient';
 
-const DB_NAME = 'SyllabusDB';
-const DB_VERSION = 5;
-const SUBJECTS_STORE = 'subjectsStore';
-const CHAPTERS_STORE = 'chaptersStore';
-const USERS_STORE = 'usersStore';
+// ─── IndexedDB PDF Cache ────────────────────────────────────────────────────
+const PDF_DB_NAME = 'AluciDatePdfCache';
+const PDF_DB_VERSION = 1;
+const PDF_STORE = 'pdfStore';
 
-interface IDBService {
-    openDB(): Promise<IDBDatabase>;
-    dbRequest<T>(storeName: string, mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest | IDBRequest<T[]>): Promise<T>;
-    getUser(email: string): Promise<User | undefined>;
-    addUser(user: User): Promise<IDBValidKey>;
-    getSubjectsByClass(className: string): Promise<SubjectData[]>;
-    getSubject(id: string): Promise<SubjectData | undefined>;
-    saveSubject(subject: SubjectData): Promise<IDBValidKey>;
-    getChapterDetails(id: string): Promise<ChapterDetails | undefined>;
-    saveChapterDetails(details: ChapterDetails): Promise<IDBValidKey>;
-    getChaptersBySubject(subjectId: string): Promise<ChapterDetails[]>;
-    clearDB(): Promise<void>;
-    hasSubjects(): Promise<boolean>;
+function openPdfDB(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(PDF_DB_NAME, PDF_DB_VERSION);
+        request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result;
+            if (!db.objectStoreNames.contains(PDF_STORE)) {
+                db.createObjectStore(PDF_STORE, { keyPath: 'fileName' });
+            }
+        };
+        request.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
+        request.onerror = (event) => reject((event.target as IDBOpenDBRequest).error);
+    });
 }
 
-export const dbService: IDBService = {
-    openDB(): Promise<IDBDatabase> {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-            request.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result;
-                if (!db.objectStoreNames.contains(SUBJECTS_STORE)) {
-                    const store = db.createObjectStore(SUBJECTS_STORE, { keyPath: 'id' });
-                    store.createIndex('classIndex', 'className', { unique: false });
-                }
-                if (!db.objectStoreNames.contains(CHAPTERS_STORE)) {
-                    db.createObjectStore(CHAPTERS_STORE, { keyPath: 'id' });
-                }
-                if (!db.objectStoreNames.contains(USERS_STORE)) {
-                    db.createObjectStore(USERS_STORE, { keyPath: 'email' });
-                }
-            };
-            request.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
-            request.onerror = (event) => reject((event.target as IDBOpenDBRequest).error);
-        });
+// ─── Main DB Service ────────────────────────────────────────────────────────
+
+export const dbService = {
+
+    // ── Users ──────────────────────────────────────────────────────────────
+
+    async getUser(email: string): Promise<User | undefined> {
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email.trim().toLowerCase())
+            .single();
+        if (error || !data) return undefined;
+        return { ...data, className: data.class_name } as User;
     },
 
-    async dbRequest<T>(storeName: string, mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest | IDBRequest<T[]>): Promise<T> {
-        const db = await (this as IDBService).openDB();
-        return new Promise<T>((resolve, reject) => {
-            const transaction = db.transaction(storeName, mode);
-            const store = transaction.objectStore(storeName);
-            const request = action(store);
-            let result: T;
-            request.onsuccess = () => { result = request.result; };
-            request.onerror = () => { reject(request.error); };
-            transaction.oncomplete = () => { resolve(result); };
-            transaction.onerror = () => { reject(transaction.error); };
-        });
+    async addUser(user: User): Promise<void> {
+        const { error } = await supabase
+            .from('users')
+            .upsert({
+                email: user.email.trim().toLowerCase(),
+                name: user.name,
+                class_name: user.className,
+                role: user.role,
+            });
+        if (error) throw new Error(`Failed to save user: ${error.message}`);
     },
 
-    getUser(email: string) {
-        return (this as IDBService).dbRequest<User | undefined>(USERS_STORE, 'readonly', store => store.get(email));
+    // ── Subjects ───────────────────────────────────────────────────────────
+
+    async getSubjectsByClass(className: string): Promise<SubjectData[]> {
+        const { data, error } = await supabase
+            .from('subjects')
+            .select('*')
+            .eq('class_name', className);
+        if (error || !data) return [];
+        return data.map(row => ({
+            id: row.id,
+            className: row.class_name,
+            subject: row.subject,
+            files: [], // PDFs are cached in IndexedDB, not fetched by default
+            structure: row.structure,
+        }));
     },
-    addUser(user: User) {
-        return (this as IDBService).dbRequest<IDBValidKey>(USERS_STORE, 'readwrite', store => store.put(user));
+
+    async getSubject(id: string): Promise<SubjectData | undefined> {
+        const { data, error } = await supabase
+            .from('subjects')
+            .select('*')
+            .eq('id', id)
+            .single();
+        if (error || !data) return undefined;
+        return {
+            id: data.id,
+            className: data.class_name,
+            subject: data.subject,
+            files: [],
+            structure: data.structure,
+        };
     },
-    async getSubjectsByClass(className: string) {
-        const results = await (this as IDBService).dbRequest<SubjectData[]>(SUBJECTS_STORE, 'readonly', store => {
-            const index = store.index('classIndex');
-            return index.getAll(className);
-        });
-        return results || [];
+
+    async saveSubject(subject: SubjectData): Promise<void> {
+        const { error } = await supabase
+            .from('subjects')
+            .upsert({
+                id: subject.id,
+                class_name: subject.className,
+                subject: subject.subject,
+                structure: subject.structure,
+            });
+        if (error) throw new Error(`Failed to save subject: ${error.message}`);
     },
-    getSubject(id: string) {
-        return (this as IDBService).dbRequest<SubjectData | undefined>(SUBJECTS_STORE, 'readonly', store => store.get(id));
+
+    // ── Chapters ───────────────────────────────────────────────────────────
+
+    async getChapterDetails(id: string): Promise<ChapterDetails | undefined> {
+        const { data, error } = await supabase
+            .from('chapters')
+            .select('*')
+            .eq('id', id)
+            .single();
+        if (error || !data) return undefined;
+        return {
+            id: data.id,
+            subjectId: data.subject_id,
+            chapterId: data.chapter_id,
+            chapterTitle: data.chapter_title,
+            summary: data.summary,
+            keywords: data.keywords,
+            mindMap: data.mind_map,
+        };
     },
-    saveSubject(subject: SubjectData) {
-        return (this as IDBService).dbRequest<IDBValidKey>(SUBJECTS_STORE, 'readwrite', store => store.put(subject));
+
+    async saveChapterDetails(details: ChapterDetails): Promise<void> {
+        const { error } = await supabase
+            .from('chapters')
+            .upsert({
+                id: details.id,
+                subject_id: details.subjectId,
+                chapter_id: details.chapterId,
+                chapter_title: details.chapterTitle,
+                summary: details.summary,
+                keywords: details.keywords,
+                mind_map: details.mindMap,
+            });
+        if (error) throw new Error(`Failed to save chapter: ${error.message}`);
     },
-    getChapterDetails(id: string) {
-        return (this as IDBService).dbRequest<ChapterDetails | undefined>(CHAPTERS_STORE, 'readonly', store => store.get(id));
-    },
-    saveChapterDetails(details: ChapterDetails) {
-        return (this as IDBService).dbRequest<IDBValidKey>(CHAPTERS_STORE, 'readwrite', store => store.put(details));
-    },
+
     async getChaptersBySubject(subjectId: string): Promise<ChapterDetails[]> {
-        const db = await (this as IDBService).openDB();
-        return new Promise<ChapterDetails[]>((resolve, reject) => {
-            const transaction = db.transaction(CHAPTERS_STORE, 'readonly');
-            const store = transaction.objectStore(CHAPTERS_STORE);
-            const request = store.openCursor();
-            const results: ChapterDetails[] = [];
-            request.onsuccess = (event) => {
-                const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
-                if (cursor) {
-                    if ((cursor.value as ChapterDetails).subjectId === subjectId) {
-                        results.push(cursor.value);
-                    }
-                    cursor.continue();
-                } else {
-                    results.sort((a, b) =>
-                        a.chapterId.localeCompare(b.chapterId, undefined, { numeric: true, sensitivity: 'base' })
-                    );
-                    resolve(results);
-                }
-            };
-            request.onerror = () => reject(request.error);
-        });
+        const { data, error } = await supabase
+            .from('chapters')
+            .select('*')
+            .eq('subject_id', subjectId)
+            .order('chapter_id', { ascending: true });
+        if (error || !data) return [];
+        return data.map(row => ({
+            id: row.id,
+            subjectId: row.subject_id,
+            chapterId: row.chapter_id,
+            chapterTitle: row.chapter_title,
+            summary: row.summary,
+            keywords: row.keywords,
+            mindMap: row.mind_map,
+        }));
     },
-    clearDB() {
-        return new Promise<void>((resolve, reject) => {
-            const req = indexedDB.deleteDatabase(DB_NAME);
+
+    // ── Conversation Memory ────────────────────────────────────────────────
+
+    async getConversationHistory(studentEmail: string, subjectId: string, chapterId: string) {
+        const { data } = await supabase
+            .from('conversations')
+            .select('history')
+            .eq('student_email', studentEmail)
+            .eq('subject_id', subjectId)
+            .eq('chapter_id', chapterId)
+            .single();
+        return data?.history ?? [];
+    },
+
+    async saveConversationHistory(
+        studentEmail: string, subjectId: string, chapterId: string, history: any[]
+    ): Promise<void> {
+        const { error } = await supabase
+            .from('conversations')
+            .upsert({
+                student_email: studentEmail,
+                subject_id: subjectId,
+                chapter_id: chapterId,
+                history,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'student_email,subject_id,chapter_id' });
+        if (error) throw new Error(`Failed to save conversation: ${error.message}`);
+    },
+
+    // ── Utility ────────────────────────────────────────────────────────────
+
+    async hasSubjects(className?: string): Promise<boolean> {
+        let query = supabase.from('subjects').select('id', { count: 'exact', head: true });
+        if (className) query = query.eq('class_name', className);
+        const { count } = await query;
+        return (count ?? 0) > 0;
+    },
+
+    // ── PDF Cache (IndexedDB — local only) ─────────────────────────────────
+
+    async savePdfToCache(fileName: string, fileBase64: string, totalPages: number): Promise<void> {
+        const db = await openPdfDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(PDF_STORE, 'readwrite');
+            const store = tx.objectStore(PDF_STORE);
+            const req = store.put({ fileName, fileBase64, totalPages });
             req.onsuccess = () => resolve();
             req.onerror = () => reject(req.error);
         });
     },
-    hasSubjects() {
-        return (this as IDBService).dbRequest<number>(SUBJECTS_STORE, 'readonly', store => store.count()).then(count => count > 0);
+
+    async getPdfFromCache(fileName: string): Promise<{ fileName: string; fileBase64: string; totalPages: number } | undefined> {
+        const db = await openPdfDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(PDF_STORE, 'readonly');
+            const store = tx.objectStore(PDF_STORE);
+            const req = store.get(fileName);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async clearDB(): Promise<void> {
+        // Clear Supabase data is done via Supabase dashboard.
+        // This clears the local PDF cache only.
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase(PDF_DB_NAME);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
     },
 };

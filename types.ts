@@ -1,8 +1,9 @@
 // --- User & Authentication ---
 export interface User {
-    email: string;
-    name: string;
-    className: string; // e.g., "Class 10"
+  email: string;
+  name: string;
+  className: string; // e.g., "Class 10"
+  role: 'admin' | 'student';
 }
 
 // --- Core Data Structures ---
@@ -14,11 +15,11 @@ export interface FileContent {
 }
 
 export interface SubjectData {
-    id: string; // Composite key: `${className}-${subject}`
-    className: string;
-    subject: string;
-    files: FileContent[]; // Can now hold multiple PDFs for one subject
-    structure: MindMapNode; // The complete structural map of all files
+  id: string; // Composite key: `${className}-${subject}`
+  className: string;
+  subject: string;
+  files: FileContent[]; // Can now hold multiple PDFs for one subject
+  structure: MindMapNode; // The complete structural map of all files
 }
 
 // --- Mind Map & Keyword Types (with interactive content) ---
@@ -33,19 +34,19 @@ export interface MindMapNode {
 }
 
 export interface Keyword {
-    term: string;
-    definition: string;
+  term: string;
+  definition: string;
 }
 
 // Stores the pre-generated content for a single chapter
 export interface ChapterDetails {
-    id: string; // Composite key: `${subjectId}-${chapterId}`
-    subjectId: string;
-    chapterId: string;
-    chapterTitle: string;
-    summary: string;
-    keywords: Keyword[];
-    mindMap: MindMapNode; // The interactive mind map for this chapter
+  id: string; // Composite key: `${subjectId}-${chapterId}`
+  subjectId: string;
+  chapterId: string;
+  chapterTitle: string;
+  summary: string;
+  keywords: Keyword[];
+  mindMap: MindMapNode; // The interactive mind map for this chapter
 }
 
 // --- AI Response & Conversation Types ---
@@ -77,6 +78,6 @@ export interface TutorResponse {
 }
 
 export interface ConversationTurn {
-    query: string;
-    response: TutorResponse;
+  query: string;
+  response: TutorResponse;
 }
