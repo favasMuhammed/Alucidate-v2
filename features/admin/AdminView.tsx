@@ -72,7 +72,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ user, onLogout, onCorpusUp
                 className: user.className,
                 subject: name,
                 files: [],
-                structure: { id: 'root', title: name, children: [] }
+                structure: { id: 'root', title: name, children: [], startPage: 0, endPage: 0, fileName: '' }
             });
             await loadSubjects();
             setActiveSubjectId(newId);

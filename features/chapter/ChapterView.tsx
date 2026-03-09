@@ -125,7 +125,7 @@ export const ChapterView: React.FC<ChapterViewProps> = ({ user, subject, chapter
         }
     };
 
-    const handleSend = async (text: stringOverride = input) => {
+    const handleSend = async (text: string = input) => {
         if (!text.trim()) return;
         const msgId = Date.now().toString();
         const userMsg: ChatMessage = { id: msgId + '_u', role: 'user', content: text, status: 'done', timestamp: Date.now() };
@@ -225,9 +225,11 @@ export const ChapterView: React.FC<ChapterViewProps> = ({ user, subject, chapter
                         ) : activeTab === 'summary' ? (
                             <motion.div key="summary" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-8 max-w-3xl mx-auto h-full overflow-y-auto custom-scrollbar">
                                 <h2 className="text-2xl font-bold font-instrument mb-6 text-brand">Chapter Summary</h2>
-                                <ReactMarkdown className="prose prose-p:text-ink-2 prose-strong:text-ink prose-sm dark:prose-invert" remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                    {chapter.summary || 'Summary not available.'}
-                                </ReactMarkdown>
+                                <div className="prose prose-p:text-ink-2 prose-strong:text-ink prose-sm dark:prose-invert max-w-none">
+                                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                        {chapter.summary || 'Summary not available.'}
+                                    </ReactMarkdown>
+                                </div>
                             </motion.div>
                         ) : (
                             <motion.div key="keywords" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-8 h-full overflow-y-auto custom-scrollbar">
