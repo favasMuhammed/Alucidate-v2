@@ -9,16 +9,26 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/geist-mono": "^5.2.7",
+    "@fontsource/geist-sans": "^5.2.5",
+    "@fontsource/instrument-serif": "^5.2.8",
     "@google/genai": "^1.29.0",
     "@gsap/react": "^2.1.2",
     "@supabase/supabase-js": "^2.99.0",
+    "@tanstack/react-query": "^5.90.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "framer-motion": "^12.35.2",
     "gsap": "^3.14.2",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "tailwind-merge": "^3.5.0"
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.13.1",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0",
+    "tailwind-merge": "^3.5.0",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.1",

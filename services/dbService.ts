@@ -100,6 +100,14 @@ export const dbService = {
         if (error) throw new Error(`Failed to save subject: ${error.message}`);
     },
 
+    async deleteSubject(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('subjects')
+            .delete()
+            .eq('id', id);
+        if (error) throw new Error(`Failed to delete subject: ${error.message}`);
+    },
+
     // ── Chapters ───────────────────────────────────────────────────────────
 
     async getChapterDetails(id: string): Promise<ChapterDetails | undefined> {
