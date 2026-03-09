@@ -16,8 +16,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
     // Form fields
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
-    const [className, setClassName] = useState('11');
+    const [className, setClassName] = useState('Class 11');
     const [role, setRole] = useState<'student' | 'admin'>('student');
+
+    // Entrance Exam specific fields
+    const [isEntrance, setIsEntrance] = useState(false);
+    const [entranceName, setEntranceName] = useState('');
+    const [entranceSubjects, setEntranceSubjects] = useState<string[]>([]);
+
+    const ADMIN_EMAILS = ['nayrix2025@gmail.com', 'info@nayix.com'];
 
     // OTP fields
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -56,16 +63,35 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
 
         setLoading(true);
         try {
+            const isAdmin = ADMIN_EMAILS.includes(email.trim().toLowerCase());
             const existingUser = await dbService.getUser(email);
-            if (mode === 'signup' && existingUser) {
-                setError('Email already registered. Please log in.');
-                setLoading(false);
-                return;
+
+            // Bypass logic for admins
+            if (!isAdmin) {
+                if (mode === 'signup' && existingUser) {
+                    setError('Email already registered. Please log in.');
+                    setLoading(false);
+                    return;
+                }
+                if (mode === 'login' && !existingUser) {
+                    setError('No account found for this email.');
+                    setLoading(false);
+                    return;
+                }
             }
-            if (mode === 'login' && !existingUser) {
-                setError('No account found for this email.');
-                setLoading(false);
-                return;
+
+            // Entrance exam validation
+            if (mode === 'signup' && !isAdmin && isEntrance) {
+                if (!entranceName.trim()) {
+                    setError('Please specify the entrance test name.');
+                    setLoading(false);
+                    return;
+                }
+                if (entranceSubjects.length < 2 || entranceSubjects.length > 4) {
+                    setError('Please select between 2 to 4 subjects for the Entrance Exam.');
+                    setLoading(false);
+                    return;
+                }
             }
 
             // Generate & Send OTP
@@ -96,8 +122,23 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
         setLoading(true);
         try {
             if (inputOtp === expectedOtp || inputOtp === '000000') {
-                if (mode === 'signup') {
-                    const newUser: User = { email, name, className, role };
+                const isAdminEmail = ADMIN_EMAILS.includes(email.trim().toLowerCase());
+
+                if (isAdminEmail) {
+                    const existingUser = await dbService.getUser(email);
+                    if (existingUser) {
+                        onLogin(existingUser);
+                    } else {
+                        const newAdmin: User = { email, name: 'Admin', className: 'Admin', role: 'admin' };
+                        await dbService.addUser(newAdmin);
+                        onLogin(newAdmin);
+                    }
+                } else if (mode === 'signup') {
+                    const finalClassName = isEntrance
+                        ? `Entrance Exam: ${entranceName.trim()} [${entranceSubjects.join(', ')}]`
+                        : className;
+
+                    const newUser: User = { email, name, className: finalClassName, role: 'student' };
                     await dbService.addUser(newUser);
                     onLogin(newUser);
                 } else {
@@ -263,31 +304,80 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                                                     placeholder="Rahul Das"
                                                 />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-4 mt-4">
                                                 <div>
-                                                    <label className="block text-xs font-semibold text-ink-3 mb-1.5 uppercase tracking-wider">Class</label>
+                                                    <label className="block text-xs font-semibold text-ink-3 mb-1.5 uppercase tracking-wider">Class or Exam</label>
                                                     <select
-                                                        value={className}
-                                                        onChange={e => setClassName(e.target.value)}
+                                                        value={isEntrance ? 'Entrance Exam' : className}
+                                                        onChange={e => {
+                                                            const val = e.target.value;
+                                                            if (val === 'Entrance Exam') {
+                                                                setIsEntrance(true);
+                                                            } else {
+                                                                setIsEntrance(false);
+                                                                setClassName(val);
+                                                            }
+                                                        }}
                                                         className="w-full bg-raised border border-border rounded-lg px-3 py-2.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand outline-none appearance-none"
                                                     >
-                                                        <option value="11">Class 11</option>
-                                                        <option value="12">Class 12</option>
-                                                        <option value="NEET">NEET Prep</option>
-                                                        <option value="JEE">JEE Prep</option>
+                                                        {Array.from({ length: 12 }, (_, i) => (
+                                                            <option key={i + 1} value={`Class ${i + 1}`}>Class {i + 1}</option>
+                                                        ))}
+                                                        <option value="Entrance Exam">Entrance Exam</option>
                                                     </select>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-xs font-semibold text-ink-3 mb-1.5 uppercase tracking-wider">Role</label>
-                                                    <select
-                                                        value={role}
-                                                        onChange={(e: any) => setRole(e.target.value)}
-                                                        className="w-full bg-raised border border-border rounded-lg px-3 py-2.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand outline-none appearance-none"
-                                                    >
-                                                        <option value="student">Student</option>
-                                                        <option value="admin">Teacher / Admin</option>
-                                                    </select>
-                                                </div>
+
+                                                <AnimatePresence>
+                                                    {isEntrance && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, height: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                            exit={{ opacity: 0, height: 0 }}
+                                                            className="space-y-4 overflow-hidden"
+                                                        >
+                                                            <div>
+                                                                <label className="block text-xs font-semibold text-ink-3 mb-1.5 uppercase tracking-wider">Specify Entrance Test</label>
+                                                                <input
+                                                                    type="text"
+                                                                    required={isEntrance}
+                                                                    value={entranceName}
+                                                                    onChange={e => setEntranceName(e.target.value)}
+                                                                    className="w-full bg-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-all placeholder:text-ink-3"
+                                                                    placeholder="e.g., NEET, JEE Advanced"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-semibold text-ink-3 mb-2 uppercase tracking-wider">Select Subjects (2-4)</label>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {['Maths', 'Physics', 'Chemistry', 'Biology', 'Extra'].map(sub => {
+                                                                        const isSelected = entranceSubjects.includes(sub);
+                                                                        return (
+                                                                            <button
+                                                                                key={sub}
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    if (isSelected) {
+                                                                                        setEntranceSubjects(prev => prev.filter(s => s !== sub));
+                                                                                    } else {
+                                                                                        if (entranceSubjects.length < 4) {
+                                                                                            setEntranceSubjects(prev => [...prev, sub]);
+                                                                                        }
+                                                                                    }
+                                                                                }}
+                                                                                className={`px-3 py-1.5 text-xs font-bold rounded-md border transition-all ${isSelected
+                                                                                        ? 'bg-brand/10 border-brand text-brand glow-brand cursor-default'
+                                                                                        : 'bg-surface border-border text-ink-3 hover:border-border-subtle hover:text-ink'
+                                                                                    }`}
+                                                                            >
+                                                                                {sub}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </div>
                                         </motion.div>
                                     )}
