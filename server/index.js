@@ -21,10 +21,7 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Log origins in development/production to debug CORS issues on Render
         if (origin) console.log(`[CORS] Request from origin: ${origin}`);
-
-        // Allow requests with no origin (e.g., mobile apps, curl, health checks)
         if (!origin || allowedOrigins.includes(origin) || origin.includes('localhost')) {
             callback(null, true);
         } else {
@@ -36,7 +33,7 @@ app.use(cors({
     allowedHeaders: ['Content-Type'],
 }));
 
-app.use(express.json({ limit: '10kb' })); // Limit body size to prevent large payload attacks
+app.use(express.json({ limit: '10kb' }));
 
 // --- Rate Limiter: max 5 OTP sends per 15 minutes per IP ---
 const otpSendLimiter = rateLimit({
@@ -47,8 +44,44 @@ const otpSendLimiter = rateLimit({
     message: { error: 'Too many OTP requests from this IP. Please wait 15 minutes.' },
 });
 
-// --- In-memory OTP store: email -> { code, expiresAt, lastSent, failedAttempts, lockedUntil } ---
-const otpStore = new Map();
+// --- Upstash Redis OTP Store (survives server restarts & cold starts) ---
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+async function redisCommand(command, ...args) {
+    if (!REDIS_URL || !REDIS_TOKEN) {
+        throw new Error('Upstash Redis credentials not configured.');
+    }
+    const response = await fetch(`${REDIS_URL}/${[command, ...args].map(encodeURIComponent).join('/')}`, {
+        headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(`Redis error: ${data.error}`);
+    return data.result;
+}
+
+async function getOtp(email) {
+    const raw = await redisCommand('GET', `otp:${email}`);
+    return raw ? JSON.parse(raw) : null;
+}
+
+async function setOtp(email, data) {
+    // Store with 10-minute TTL (Redis auto-deletes after expiry)
+    await redisCommand('SET', `otp:${email}`, JSON.stringify(data), 'EX', '600');
+}
+
+async function deleteOtp(email) {
+    await redisCommand('DEL', `otp:${email}`);
+}
+
+async function updateOtp(email, updates) {
+    const existing = await getOtp(email);
+    if (!existing) return;
+    // Preserve remaining TTL by re-setting with 600s from now (worst case adds ~seconds)
+    const ttlRaw = await redisCommand('TTL', `otp:${email}`);
+    const ttl = ttlRaw > 0 ? ttlRaw : 300;
+    await redisCommand('SET', `otp:${email}`, JSON.stringify({ ...existing, ...updates }), 'EX', String(ttl));
+}
 
 // --- Resend Email Function ---
 async function sendEmail({ to, subject, html }) {
@@ -78,27 +111,27 @@ async function sendEmail({ to, subject, html }) {
     return data;
 }
 
-// --- Cleanup expired OTPs every 5 minutes ---
-setInterval(() => {
-    const now = Date.now();
-    for (const [email, data] of otpStore.entries()) {
-        if (now > data.expiresAt) {
-            otpStore.delete(email);
-        }
-    }
-}, 5 * 60 * 1000);
-
 // --- Root Info ---
 app.get('/', (req, res) => {
     res.send('Alucidate OTP Backend is active. Use /health for status.');
 });
 
 // --- Health Check ---
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+    let redisStatus = 'unconfigured';
+    if (REDIS_URL && REDIS_TOKEN) {
+        try {
+            await redisCommand('PING');
+            redisStatus = 'connected';
+        } catch {
+            redisStatus = 'error';
+        }
+    }
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'production'
+        environment: process.env.NODE_ENV || 'production',
+        redis: redisStatus,
     });
 });
 
@@ -116,7 +149,7 @@ app.post('/api/otp/send', otpSendLimiter, async (req, res) => {
         }
 
         const now = Date.now();
-        const existingOTP = otpStore.get(email);
+        const existingOTP = await getOtp(email);
 
         // 30-second resend cooldown
         if (existingOTP && (now - existingOTP.lastSent) < 30 * 1000) {
@@ -127,7 +160,7 @@ app.post('/api/otp/send', otpSendLimiter, async (req, res) => {
         // Generate cryptographically secure 6-digit OTP
         const otpCode = crypto.randomInt(100000, 999999).toString();
 
-        otpStore.set(email, {
+        await setOtp(email, {
             code: otpCode,
             expiresAt: now + 5 * 60 * 1000,
             lastSent: now,
@@ -169,48 +202,54 @@ app.post('/api/otp/send', otpSendLimiter, async (req, res) => {
 });
 
 // --- POST /api/otp/verify ---
-app.post('/api/otp/verify', (req, res) => {
-    const rawEmail = req.body?.email;
-    const code = req.body?.code;
+app.post('/api/otp/verify', async (req, res) => {
+    try {
+        const rawEmail = req.body?.email;
+        const code = req.body?.code;
 
-    if (!rawEmail || !code) {
-        return res.status(400).json({ error: 'Email and code are required.' });
-    }
-
-    const email = rawEmail.trim().toLowerCase();
-    const storedData = otpStore.get(email);
-
-    if (!storedData) {
-        return res.status(400).json({ error: 'No active verification code for this email.' });
-    }
-
-    // Check brute-force lockout
-    if (storedData.lockedUntil && Date.now() < storedData.lockedUntil) {
-        const waitMinutes = Math.ceil((storedData.lockedUntil - Date.now()) / 60000);
-        return res.status(429).json({ error: `Too many failed attempts. Try again in ${waitMinutes} minute(s).` });
-    }
-
-    if (Date.now() > storedData.expiresAt) {
-        otpStore.delete(email);
-        return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
-    }
-
-    if (storedData.code !== String(code).trim()) {
-        storedData.failedAttempts = (storedData.failedAttempts || 0) + 1;
-
-        // Lock out after 5 failed attempts for 5 minutes
-        if (storedData.failedAttempts >= 5) {
-            storedData.lockedUntil = Date.now() + 5 * 60 * 1000;
-            return res.status(429).json({ error: 'Too many failed attempts. This code is locked for 5 minutes.' });
+        if (!rawEmail || !code) {
+            return res.status(400).json({ error: 'Email and code are required.' });
         }
 
-        const remaining = 5 - storedData.failedAttempts;
-        return res.status(400).json({ error: `Invalid code. ${remaining} attempt(s) remaining.` });
-    }
+        const email = rawEmail.trim().toLowerCase();
+        const storedData = await getOtp(email);
 
-    // ✅ Verified — clear the OTP so it cannot be reused
-    otpStore.delete(email);
-    res.json({ success: true, message: 'Verification successful.' });
+        if (!storedData) {
+            return res.status(400).json({ error: 'No active verification code for this email. Please request a new one.' });
+        }
+
+        // Check brute-force lockout
+        if (storedData.lockedUntil && Date.now() < storedData.lockedUntil) {
+            const waitMinutes = Math.ceil((storedData.lockedUntil - Date.now()) / 60000);
+            return res.status(429).json({ error: `Too many failed attempts. Try again in ${waitMinutes} minute(s).` });
+        }
+
+        if (Date.now() > storedData.expiresAt) {
+            await deleteOtp(email);
+            return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
+        }
+
+        if (storedData.code !== String(code).trim()) {
+            const failedAttempts = (storedData.failedAttempts || 0) + 1;
+
+            // Lock out after 5 failed attempts for 5 minutes
+            if (failedAttempts >= 5) {
+                await updateOtp(email, { failedAttempts, lockedUntil: Date.now() + 5 * 60 * 1000 });
+                return res.status(429).json({ error: 'Too many failed attempts. This code is locked for 5 minutes.' });
+            }
+
+            await updateOtp(email, { failedAttempts });
+            const remaining = 5 - failedAttempts;
+            return res.status(400).json({ error: `Invalid code. ${remaining} attempt(s) remaining.` });
+        }
+
+        // ✅ Verified — delete from Redis so it cannot be reused
+        await deleteOtp(email);
+        res.json({ success: true, message: 'Verification successful.' });
+    } catch (error) {
+        console.error('Verify OTP Error:', error?.message || error);
+        res.status(500).json({ error: 'Verification failed. Please try again.' });
+    }
 });
 
 app.listen(PORT, () => {
