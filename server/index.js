@@ -65,7 +65,7 @@ async function sendEmail({ to, subject, html }) {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            from: 'Alucidate <onboarding@resend.dev>', // Resend default testing domain
+            from: process.env.FROM_EMAIL || 'Alucidate <onboarding@resend.dev>',
             to,
             subject,
             html,
