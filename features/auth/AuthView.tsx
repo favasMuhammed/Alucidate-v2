@@ -117,7 +117,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
             }
 
             // Generate & Send OTP
-            if (email.includes('test')) {
+            if (email.trim().toLowerCase() === 'test@nayix.com') {
                 const generated = Math.floor(100000 + Math.random() * 900000).toString();
                 setExpectedOtp(generated);
                 console.log(`[DEV OTP]: ${generated}`);
@@ -138,11 +138,10 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
         setError('');
         setLoading(true);
         try {
-            const isBypass = inputOtp === '000000';
-            const isTestEmail = email.includes('test');
+            const isTestEmail = email.trim().toLowerCase() === 'test@nayix.com';
             const isTestMatch = isTestEmail && inputOtp === expectedOtp;
 
-            if (!isBypass && !isTestMatch) {
+            if (!isTestMatch) {
                 // Call actual backend verification
                 await verifyOTP(email, inputOtp);
             }
