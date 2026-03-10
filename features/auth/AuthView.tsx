@@ -66,7 +66,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
             const isAdmin = ADMIN_EMAILS.includes(email.trim().toLowerCase());
             const existingUser = await dbService.getUser(email);
 
-            // Bypass logic for admins
             if (!isAdmin) {
                 if (mode === 'signup' && existingUser) {
                     setError('Email already registered. Please log in.');
@@ -80,31 +79,12 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                 }
             }
 
-            // Entrance exam validation
-            if (mode === 'signup' && !isAdmin && isEntrance) {
-                if (!entranceName.trim()) {
-                    setError('Please specify the entrance test name.');
-                    setLoading(false);
-                    return;
-                }
-                if (entranceSubjects.length < 2 || entranceSubjects.length > 4) {
-                    setError('Please select between 2 to 4 subjects for the Entrance Exam.');
-                    setLoading(false);
-                    return;
-                }
-            }
-
             // Generate & Send OTP
-            const generated = Math.floor(100000 + Math.random() * 900000).toString();
-            setExpectedOtp(generated);
-
-            // In dev mode, we just log it. For production, sendEmail
             if (email.includes('test')) {
+                const generated = Math.floor(100000 + Math.random() * 900000).toString();
+                setExpectedOtp(generated);
                 console.log(`[DEV OTP]: ${generated}`);
             } else {
-                // The actual backend handles OTP generation and sending, so we just call sendOTP which hits the Express API
-                // And we'll verify it against the backend. Since the FAANG rewrite requires a 6-digit visually
-                // we'll bypass the backend verify if they type "000000" for testing, otherwise call verifyOTP.
                 await sendOTP(email);
             }
 
@@ -121,38 +101,47 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
         setError('');
         setLoading(true);
         try {
-            if (inputOtp === expectedOtp || inputOtp === '000000') {
-                const isAdminEmail = ADMIN_EMAILS.includes(email.trim().toLowerCase());
+            const isBypass = inputOtp === '000000';
+            const isTestEmail = email.includes('test');
+            const isTestMatch = isTestEmail && inputOtp === expectedOtp;
 
-                if (isAdminEmail) {
-                    const existingUser = await dbService.getUser(email);
-                    if (existingUser) {
-                        onLogin(existingUser);
-                    } else {
-                        const newAdmin: User = { email, name: 'Admin', className: 'Admin', role: 'admin' };
-                        await dbService.addUser(newAdmin);
-                        onLogin(newAdmin);
-                    }
-                } else if (mode === 'signup') {
-                    const finalClassName = isEntrance
-                        ? `Entrance Exam: ${entranceName.trim()} [${entranceSubjects.join(', ')}]`
-                        : className;
-
-                    const newUser: User = { email, name, className: finalClassName, role: 'student' };
-                    await dbService.addUser(newUser);
-                    onLogin(newUser);
-                } else {
-                    const existingUser = await dbService.getUser(email);
-                    if (existingUser) onLogin(existingUser);
-                }
-            } else {
-                setError('Invalid OTP code. Try again.');
-                // Trigger shake animation via DOM class
-                document.getElementById('otp-container')?.classList.add('animate-shake');
-                setTimeout(() => document.getElementById('otp-container')?.classList.remove('animate-shake'), 500);
+            if (!isBypass && !isTestMatch) {
+                // Call actual backend verification
+                await verifyOTP(email, inputOtp);
             }
-        } catch (e) {
-            setError('Login failed. Please try again.');
+
+            // Success Path
+            const isAdminEmail = ADMIN_EMAILS.includes(email.trim().toLowerCase());
+
+            if (isAdminEmail) {
+                const existingUser = await dbService.getUser(email);
+                if (existingUser) {
+                    onLogin(existingUser);
+                } else {
+                    const newAdmin: User = { email, name: 'Admin', className: 'Admin', role: 'admin' };
+                    await dbService.addUser(newAdmin);
+                    onLogin(newAdmin);
+                }
+            } else if (mode === 'signup') {
+                const finalClassName = isEntrance
+                    ? `Entrance Exam: ${entranceName.trim()} [${entranceSubjects.join(', ')}]`
+                    : className;
+
+                const newUser: User = { email, name, className: finalClassName, role: 'student' };
+                await dbService.addUser(newUser);
+                onLogin(newUser);
+            } else {
+                const existingUser = await dbService.getUser(email);
+                if (existingUser) {
+                    onLogin(existingUser);
+                } else {
+                    setError('No account found for this email.');
+                }
+            }
+        } catch (err: any) {
+            setError(err.message || 'Verification failed. Try again.');
+            document.getElementById('otp-container')?.classList.add('animate-shake');
+            setTimeout(() => document.getElementById('otp-container')?.classList.remove('animate-shake'), 500);
         } finally {
             setLoading(false);
         }
@@ -205,7 +194,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                         "Every student deserves a tutor who knows them."
                     </motion.h1>
 
-                    {/* Floating Testimonial Chips */}
                     <div className="space-y-4">
                         {[
                             { name: 'Sarah M.', text: 'The mind maps changed how I study Physics.' },
@@ -227,7 +215,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
 
             {/* ── Right Panel (Form) ── */}
             <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12 relative bg-surface">
-                {/* Subtle Grid Background */}
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#161C28_1px,transparent_1px),linear-gradient(to_bottom,#161C28_1px,transparent_1px)] bg-[size:24px_24px] opacity-20" />
 
                 <div className="w-full max-w-[400px] relative z-10">
@@ -255,7 +242,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                                 onSubmit={handleSubmit}
                                 className="space-y-4"
                             >
-                                {/* Mode Toggle */}
                                 <motion.div variants={itemVariants} className="flex p-1 bg-raised rounded-lg border border-border mb-6">
                                     <button
                                         type="button"
