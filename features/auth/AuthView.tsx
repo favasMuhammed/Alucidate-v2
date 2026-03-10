@@ -41,14 +41,14 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
         visible: {
             opacity: 1,
             x: 0,
-            transition: { staggerChildren: 0.08, ease: 'easeOut' }
+            transition: { staggerChildren: 0.08, ease: 'easeOut' as any }
         },
         exit: { opacity: 0, x: 20 }
     };
 
     const itemVariants = {
         hidden: { opacity: 0, y: 15 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } }
+        visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as any } }
     };
 
     // ─── Handlers ─────────────────────────────────────────────────────────── //
@@ -365,8 +365,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                                                                                     }
                                                                                 }}
                                                                                 className={`px-3 py-1.5 text-xs font-bold rounded-md border transition-all ${isSelected
-                                                                                        ? 'bg-brand/10 border-brand text-brand glow-brand cursor-default'
-                                                                                        : 'bg-surface border-border text-ink-3 hover:border-border-subtle hover:text-ink'
+                                                                                    ? 'bg-brand/10 border-brand text-brand glow-brand cursor-default'
+                                                                                    : 'bg-surface border-border text-ink-3 hover:border-border-subtle hover:text-ink'
                                                                                     }`}
                                                                             >
                                                                                 {sub}

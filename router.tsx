@@ -1,9 +1,10 @@
 import React, { lazy } from 'react';
-import { createBrowserRouter, Navigate, useNavigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from './layouts/AppShell';
 import { AuthView } from './features/auth/AuthView';
 import { useAuth } from './hooks/useAuth';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 // ── Lazy loaded views ──────────────────────────────────────────────────────
 const DashboardView = lazy(() => import('./features/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
@@ -21,16 +22,11 @@ const PageLoader = () => (
 // ── Auth Guard ─────────────────────────────────────────────────────────────
 function AuthGuard({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
     const { user, loading } = useAuth();
-    const navigate = useNavigate();
 
     if (loading) return <PageLoader />;
-    if (!user) {
-        return <Navigate to="/auth" replace />;
-    }
-    if (adminOnly && user.role !== 'admin') {
-        return <Navigate to="/dashboard" replace />;
-    }
-    return <>{children}</>;
+    if (!user) return <Navigate to="/auth" replace />;
+    if (adminOnly && user.role !== 'admin') return <Navigate to="/dashboard" replace />;
+    return <ErrorBoundary>{children}</ErrorBoundary>;
 }
 
 // ── Router ─────────────────────────────────────────────────────────────────
