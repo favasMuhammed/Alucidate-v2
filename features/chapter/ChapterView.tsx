@@ -57,6 +57,7 @@ export const ChapterView: React.FC = () => {
     const [input, setInput] = useState('');
     const [activeTab, setActiveTab] = useState<'mindmap' | 'summary' | 'keywords'>('mindmap');
     const [selectedNode, setSelectedNode] = useState<NodeType | null>(null);
+    const [isChatOpen, setIsChatOpen] = useState(true);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     // Load subject, chapter, and conversation history
@@ -159,7 +160,7 @@ export const ChapterView: React.FC = () => {
     return (
         <div className="h-[calc(100vh-56px)] w-full flex flex-col lg:flex-row overflow-hidden bg-void font-sans mt-14">
             {/* ── Left Panel ────────────────────────────────────────────── */}
-            <div className="w-full lg:w-3/5 h-[45vh] lg:h-full flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-surface shrink-0 lg:shrink">
+            <div className={`w-full ${isChatOpen ? 'lg:w-3/5' : 'lg:w-full'} h-[45vh] lg:h-full flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-surface shrink-0 lg:shrink transition-all duration-300 ease-in-out`}>
                 {/* Navbar */}
                 <div className="h-14 flex items-center justify-between px-6 border-b border-border bg-surface/80 backdrop-blur z-20 shrink-0">
                     <div className="flex items-center gap-4">
@@ -168,12 +169,26 @@ export const ChapterView: React.FC = () => {
                         </button>
                         <h1 className="font-bold text-base text-ink line-clamp-1">{chapter.chapterTitle}</h1>
                     </div>
-                    <div className="flex bg-void rounded-lg p-1 border border-border shadow-sm">
-                        {(['mindmap', 'summary', 'keywords'] as const).map(tab => (
-                            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-1 text-[11px] font-bold uppercase tracking-widest rounded-md transition-all ${activeTab === tab ? 'bg-brand text-white shadow-md' : 'text-ink-3 hover:text-ink-2 hover:bg-raised'}`}>
-                                {tab}
-                            </button>
-                        ))}
+                    <div className="flex items-center gap-3">
+                        <div className="flex bg-void rounded-lg p-1 border border-border shadow-sm">
+                            {(['mindmap', 'summary', 'keywords'] as const).map(tab => (
+                                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-1 text-[11px] font-bold uppercase tracking-widest rounded-md transition-all ${activeTab === tab ? 'bg-brand text-white shadow-md' : 'text-ink-3 hover:text-ink-2 hover:bg-raised'}`}>
+                                    {tab}
+                                </button>
+                            ))}
+                        </div>
+                        {/* Chat Toggle Button */}
+                        <button
+                            onClick={() => setIsChatOpen(!isChatOpen)}
+                            className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg hover:bg-raised text-ink-3 hover:text-ink transition-colors border border-border bg-surface shadow-sm"
+                            title={isChatOpen ? "Close Chat Panel" : "Open Chat Panel"}
+                        >
+                            {isChatOpen ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="15" y1="3" x2="15" y2="21"></line><polyline points="10 8 13 12 10 16"></polyline></svg>
+                            ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="15" y1="3" x2="15" y2="21"></line><polyline points="10 16 7 12 10 8"></polyline></svg>
+                            )}
+                        </button>
                     </div>
                 </div>
 
@@ -215,82 +230,92 @@ export const ChapterView: React.FC = () => {
             </div>
 
             {/* ── Right Panel (Tutor Chat) ──────────────────────────────── */}
-            <div className="w-full lg:w-2/5 flex-1 lg:h-full flex flex-col bg-void relative">
-                {/* Chat Header */}
-                <div className="h-14 flex items-center justify-between px-6 border-b border-border shadow-sm bg-surface/90 backdrop-blur z-20 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="relative flex items-center justify-center w-6 h-6 rounded-md bg-brand/10 border border-brand/20">
-                            <div className="w-1.5 h-1.5 rounded-full bg-brand glow-brand animate-pulse" />
+            <AnimatePresence>
+                {(isChatOpen || window.innerWidth < 1024) && (
+                    <motion.div
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: window.innerWidth < 1024 ? '100%' : '40%' }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                        className="w-full lg:w-2/5 flex-1 lg:h-full flex flex-col bg-void relative overflow-hidden shrink-0 border-t lg:border-t-0 border-border"
+                    >
+                        {/* Chat Header */}
+                        <div className="h-14 flex items-center justify-between px-6 border-b border-border shadow-sm bg-surface/90 backdrop-blur z-20 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="relative flex items-center justify-center w-6 h-6 rounded-md bg-brand/10 border border-brand/20">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-brand glow-brand animate-pulse" />
+                                </div>
+                                <span className="font-bold text-sm text-ink tracking-tight uppercase">Tutor</span>
+                            </div>
+                            <span className="text-[10px] text-ink-3 font-mono font-bold uppercase tracking-widest border border-border px-2 py-0.5 rounded shadow-sm">GPT-4 Class</span>
                         </div>
-                        <span className="font-bold text-sm text-ink tracking-tight uppercase">Tutor</span>
-                    </div>
-                    <span className="text-[10px] text-ink-3 font-mono font-bold uppercase tracking-widest border border-border px-2 py-0.5 rounded shadow-sm">GPT-4 Class</span>
-                </div>
 
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-                    {chatHistory.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-                            <div className="w-16 h-16 rounded-2xl bg-surface border border-border/50 flex items-center justify-center mb-6 shadow-xl shadow-brand/5">
-                                <svg className="w-8 h-8 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                            </div>
-                            <h3 className="font-[Instrument_Serif] text-3xl text-ink mb-2 tracking-tight">Hello, {user.name.split(' ')[0]}</h3>
-                            <p className="text-sm text-ink-3 mb-8">Concept mastery starts with a single question.</p>
-                            <div className="w-full space-y-2 text-left">
-                                {["Give me an overview of this chapter.", "Explain the most difficult concept simply.", "Generate a 3-question quiz."].map((p, i) => (
-                                    <button key={i} onClick={() => handleSend(p)} className="w-full p-3.5 bg-surface border border-border rounded-xl text-xs font-medium text-ink-2 hover:border-brand/40 hover:shadow-[0_2px_12px_rgba(var(--color-brand),0.05)] transition-all flex items-center gap-3 group">
-                                        <div className="w-6 h-6 rounded flex items-center justify-center bg-raised text-brand/50 group-hover:text-brand transition-colors">→</div>
-                                        {p}
-                                    </button>
-                                ))}
-                            </div>
+                        {/* Messages */}
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+                            {chatHistory.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto">
+                                    <div className="w-16 h-16 rounded-2xl bg-surface border border-border/50 flex items-center justify-center mb-6 shadow-xl shadow-brand/5">
+                                        <svg className="w-8 h-8 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                    </div>
+                                    <h3 className="font-[Instrument_Serif] text-3xl text-ink mb-2 tracking-tight">Hello, {user.name.split(' ')[0]}</h3>
+                                    <p className="text-sm text-ink-3 mb-8">Concept mastery starts with a single question.</p>
+                                    <div className="w-full space-y-2 text-left">
+                                        {["Give me an overview of this chapter.", "Explain the most difficult concept simply.", "Generate a 3-question quiz."].map((p, i) => (
+                                            <button key={i} onClick={() => handleSend(p)} className="w-full p-3.5 bg-surface border border-border rounded-xl text-xs font-medium text-ink-2 hover:border-brand/40 hover:shadow-[0_2px_12px_rgba(var(--color-brand),0.05)] transition-all flex items-center gap-3 group">
+                                                <div className="w-6 h-6 rounded flex items-center justify-center bg-raised text-brand/50 group-hover:text-brand transition-colors">→</div>
+                                                {p}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : chatHistory.map(m => (
+                                <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[85%] rounded-3xl p-5 shadow-sm ${m.role === 'user' ? 'bg-brand text-white shadow-brand/10 rounded-br-sm' : 'bg-surface border border-border/60 text-ink rounded-bl-sm'}`}>
+                                        {m.role === 'user' ? (
+                                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                                        ) : m.status === 'typing' ? (
+                                            <div className="flex gap-1.5 items-center h-4">
+                                                {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full bg-brand/50 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
+                                            </div>
+                                        ) : m.status === 'error' ? (
+                                            <p className="text-danger text-sm">{m.content}</p>
+                                        ) : (
+                                            <TypewriterResponse html={m.parsed?.answer || m.content} />
+                                        )}
+                                        {m.role === 'assistant' && m.status === 'done' && (
+                                            <div className="mt-3 pt-3 border-t border-border/50 flex justify-end">
+                                                <button onClick={() => navigator.clipboard.writeText(m.parsed?.answer || m.content)} className="text-xs text-ink-3 hover:text-ink transition-colors px-2 py-1 flex items-center gap-1.5">
+                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                                    Copy
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            ))}
+                            <div ref={chatEndRef} className="h-4" />
                         </div>
-                    ) : chatHistory.map(m => (
-                        <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[85%] rounded-3xl p-5 shadow-sm ${m.role === 'user' ? 'bg-brand text-white shadow-brand/10 rounded-br-sm' : 'bg-surface border border-border/60 text-ink rounded-bl-sm'}`}>
-                                {m.role === 'user' ? (
-                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
-                                ) : m.status === 'typing' ? (
-                                    <div className="flex gap-1.5 items-center h-4">
-                                        {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full bg-brand/50 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
-                                    </div>
-                                ) : m.status === 'error' ? (
-                                    <p className="text-danger text-sm">{m.content}</p>
-                                ) : (
-                                    <TypewriterResponse html={m.parsed?.answer || m.content} />
-                                )}
-                                {m.role === 'assistant' && m.status === 'done' && (
-                                    <div className="mt-3 pt-3 border-t border-border/50 flex justify-end">
-                                        <button onClick={() => navigator.clipboard.writeText(m.parsed?.answer || m.content)} className="text-xs text-ink-3 hover:text-ink transition-colors px-2 py-1 flex items-center gap-1.5">
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                                            Copy
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </motion.div>
-                    ))}
-                    <div ref={chatEndRef} className="h-4" />
-                </div>
 
-                {/* Input */}
-                <div className="p-4 sm:p-6 bg-void shrink-0 pb-safe border-t border-border/30">
-                    <form onSubmit={e => { e.preventDefault(); handleSend(); }} className="flex items-end gap-3 bg-surface border border-border rounded-[24px] p-2 pl-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)] focus-within:ring-2 focus-within:ring-brand/30 focus-within:border-brand transition-all relative">
-                        <textarea
-                            value={input}
-                            onChange={e => setInput(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                            placeholder="Ask ALUCIDATE Tutor anything..."
-                            className="flex-1 max-h-32 min-h-[44px] bg-transparent text-sm text-ink placeholder:text-ink-3 resize-none outline-none py-3"
-                            rows={1}
-                        />
-                        <button type="submit" disabled={!input.trim()} className="absolute right-2 bottom-2 bg-brand hover:bg-brand-dim text-white disabled:bg-raised disabled:text-ink-3 disabled:border-border transition-all w-10 h-10 flex items-center justify-center shrink-0 rounded-full disabled:shadow-none shadow-brand/20">
-                            <svg className="w-4 h-4 translate-x-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" /></svg>
-                        </button>
-                    </form>
-                    <p className="text-center text-[10px] text-ink-3 mt-3">Alucidate AI may produce inaccurate information about people, places, or facts.</p>
-                </div>
-            </div>
+                        {/* Input */}
+                        <div className="p-4 sm:p-6 bg-void shrink-0 pb-safe border-t border-border/30">
+                            <form onSubmit={e => { e.preventDefault(); handleSend(); }} className="flex items-end gap-3 bg-surface border border-border rounded-[24px] p-2 pl-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)] focus-within:ring-2 focus-within:ring-brand/30 focus-within:border-brand transition-all relative">
+                                <textarea
+                                    value={input}
+                                    onChange={e => setInput(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                                    placeholder="Ask ALUCIDATE Tutor anything..."
+                                    className="flex-1 max-h-32 min-h-[44px] bg-transparent text-sm text-ink placeholder:text-ink-3 resize-none outline-none py-3"
+                                    rows={1}
+                                />
+                                <button type="submit" disabled={!input.trim()} className="absolute right-2 bottom-2 bg-brand hover:bg-brand-dim text-white disabled:bg-raised disabled:text-ink-3 disabled:border-border transition-all w-10 h-10 flex items-center justify-center shrink-0 rounded-full disabled:shadow-none shadow-brand/20">
+                                    <svg className="w-4 h-4 translate-x-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" /></svg>
+                                </button>
+                            </form>
+                            <p className="text-center text-[10px] text-ink-3 mt-3">Alucidate AI may produce inaccurate information about people, places, or facts.</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

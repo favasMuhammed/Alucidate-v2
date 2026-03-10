@@ -48,9 +48,9 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
     // ── Expand/Collapse State ──
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
         const set = new Set<string>();
-        // Auto-expand Level 0 (Root) and Level 1 (Chapters) by default
+        // Auto-expand ONLY Level 0 (Root) by default to prevent cognitive overload
         const traverse = (n: MindMapNodeType, level: number) => {
-            if (level < 2) set.add(n.id);
+            if (level < 1) set.add(n.id);
             n.children?.forEach(c => traverse(c, level + 1));
         };
         traverse(data, 0);
@@ -209,10 +209,10 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
                                 transition={{ type: 'spring', stiffness: 350, damping: 28, mass: 0.8 }}
                                 onClick={(e) => { e.stopPropagation(); onNodeSelect(node); }}
                                 className={`absolute flex items-center p-4 cursor-pointer transition-all shadow-md group ${isRoot
-                                        ? 'bg-[url(#rootGrad)] text-white rounded-3xl border border-white/10 shadow-brand/20 z-30'
-                                        : node.level === 1
-                                            ? 'bg-surface border border-border text-ink rounded-2xl hover:border-brand-dim hover:shadow-lg z-20'
-                                            : 'bg-void border border-border-subtle text-ink-2 rounded-2xl hover:border-brand-dim hover:text-ink z-10'
+                                    ? 'bg-[url(#rootGrad)] text-white rounded-3xl border border-white/10 shadow-brand/20 z-30'
+                                    : node.level === 1
+                                        ? 'bg-surface border border-border text-ink rounded-2xl hover:border-brand-dim hover:shadow-lg z-20'
+                                        : 'bg-void border border-border-subtle text-ink-2 rounded-2xl hover:border-brand-dim hover:text-ink z-10'
                                     } ${isActive && !isRoot ? 'ring-2 ring-brand ring-offset-2 ring-offset-void drop-shadow-lg bg-raised' : ''}`}
                                 style={{ width: w, height: h }}
                             >
@@ -228,8 +228,8 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
                                     <button
                                         onClick={(e) => toggleExpand(node.id, e)}
                                         className={`absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center border font-bold text-xs transition-all ${isExpanded
-                                                ? 'bg-surface border-border text-ink-2 hover:text-brand'
-                                                : 'bg-brand text-white border-brand shadow-md glow-brand hover:bg-white hover:text-brand'
+                                            ? 'bg-surface border-border text-ink-2 hover:text-brand'
+                                            : 'bg-brand text-white border-brand shadow-md glow-brand hover:bg-white hover:text-brand'
                                             }`}
                                     >
                                         {isExpanded ? '−' : '+'}
