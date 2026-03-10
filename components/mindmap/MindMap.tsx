@@ -15,53 +15,10 @@ interface MindMapProps {
     activeNodeId: string | null;
 }
 
-// ── Layout Math ──
-function calculateLayout(root: MindMapNodeType, width: number, height: number): SVGNode[] {
-    const nodes: SVGNode[] = [];
-    const levelCounts: Record<number, number> = {};
-    const levelSpacing = 300; // X distance
-    const verticalSpacing = 100; // Y distance
-
-    // Count nodes per level to center them vertically
-    const countNodes = (node: MindMapNodeType, level: number) => {
-        levelCounts[level] = (levelCounts[level] || 0) + 1;
-        node.children?.forEach(c => countNodes(c, level + 1));
-    };
-    countNodes(root, 0);
-
-    const levelCurrentIdx: Record<number, number> = {};
-
-    const traverse = (node: MindMapNodeType, level: number, parent?: SVGNode): SVGNode => {
-        const idx = levelCurrentIdx[level] || 0;
-        levelCurrentIdx[level] = idx + 1;
-
-        const totalAtLevel = levelCounts[level] || 1;
-
-        // Base coordinates
-        let x = level * levelSpacing + 200;
-        let y = (height / 2) - ((totalAtLevel * verticalSpacing) / 2) + (idx * verticalSpacing);
-
-        // Nudge children to align with parent if possible, but keep it simple for now
-        if (parent && level > 1) {
-            y = parent.y + ((idx - ((totalAtLevel - 1) / 2)) * verticalSpacing);
-        }
-
-        const mapped: SVGNode = { ...node, x, y, level, parent };
-        nodes.push(mapped);
-
-        node.children?.forEach(c => traverse(c, level + 1, mapped));
-        return mapped;
-    };
-
-    traverse(root, 0);
-    return nodes;
-}
-
 // ── SVG Curved Edge ──
 const MindMapEdge: React.FC<{ source: SVGNode; target: SVGNode; isActive: boolean }> = ({ source, target, isActive }) => {
-    // Start from right center of source, to left center of target
-    const sourceX = source.level === 0 ? source.x + 90 : source.x + 70;
-    const targetX = target.x - 70;
+    const sourceX = source.level === 0 ? source.x + 100 : source.x + 80;
+    const targetX = target.x - 80;
     const cX = (sourceX + targetX) / 2;
     const path = `M ${sourceX} ${source.y} C ${cX} ${source.y}, ${cX} ${target.y}, ${targetX} ${target.y}`;
 
@@ -72,8 +29,8 @@ const MindMapEdge: React.FC<{ source: SVGNode; target: SVGNode; isActive: boolea
             stroke={isActive ? 'var(--color-brand)' : 'var(--color-border)'}
             strokeWidth={isActive ? 2.5 : 1.5}
             initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ pathLength: 1, opacity: 1 }}
-            transition={{ duration: 0.8, ease: 'easeInOut' }}
+            animate={{ pathLength: 1, opacity: 1, d: path }}
+            transition={{ duration: 0.6, type: 'spring', bounce: 0.2 }}
             className={isActive ? 'drop-shadow-[var(--shadow-glow-brand)]' : ''}
         />
     );
@@ -88,24 +45,87 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
     const [isDragging, setIsDragging] = useState(false);
     const startPanParams = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
 
+    // ── Expand/Collapse State ──
+    const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
+        const set = new Set<string>();
+        // Auto-expand Level 0 (Root) and Level 1 (Chapters) by default
+        const traverse = (n: MindMapNodeType, level: number) => {
+            if (level < 2) set.add(n.id);
+            n.children?.forEach(c => traverse(c, level + 1));
+        };
+        traverse(data, 0);
+        return set;
+    });
+
+    const toggleExpand = (nodeId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExpandedNodes(prev => {
+            const next = new Set(prev);
+            if (next.has(nodeId)) next.delete(nodeId);
+            else next.add(nodeId);
+            return next;
+        });
+    };
+
     useEffect(() => {
         if (containerRef.current) {
-            setDimensions({
-                w: containerRef.current.clientWidth,
-                h: containerRef.current.clientHeight
-            });
-            // Center roughly
-            setPan({ x: 50, y: containerRef.current.clientHeight / 2 - 400 });
+            setDimensions({ w: containerRef.current.clientWidth, h: containerRef.current.clientHeight });
+            setPan({ x: 100, y: containerRef.current.clientHeight / 2 - 400 });
         }
     }, [data]);
 
-    const layoutNodes = useMemo(() => calculateLayout(data, Math.max(dimensions.w, 1000), Math.max(dimensions.h, 800)), [data, dimensions]);
+    // ── Dynamic Layout Engine ──
+    const layoutNodes = useMemo(() => {
+        const nodes: SVGNode[] = [];
+        const levelCounts: Record<number, number> = {};
+        const levelSpacing = 260; // X distance
+        const verticalSpacing = 90; // Y distance
+
+        // Count ONLY expanded nodes per level to center them accurately
+        const countNodes = (node: MindMapNodeType, level: number) => {
+            levelCounts[level] = (levelCounts[level] || 0) + 1;
+            if (expandedNodes.has(node.id)) {
+                node.children?.forEach(c => countNodes(c, level + 1));
+            }
+        };
+        countNodes(data, 0);
+
+        const levelCurrentIdx: Record<number, number> = {};
+        const heightBound = Math.max(dimensions.h, 800);
+
+        const traverse = (node: MindMapNodeType, level: number, parent?: SVGNode): SVGNode => {
+            const idx = levelCurrentIdx[level] || 0;
+            levelCurrentIdx[level] = idx + 1;
+
+            const totalAtLevel = levelCounts[level] || 1;
+            let x = level * levelSpacing + 200;
+            // Center the entire block of nodes vertically
+            let y = (heightBound / 2) - ((totalAtLevel * verticalSpacing) / 2) + (idx * verticalSpacing);
+
+            // Give a sleek hierarchical curve drop for deep children
+            if (parent && level > 1) {
+                // Pin child slightly relatively to the parent height to prevent huge jumps, blending absolute centering with relative pinning
+                y = parent.y + ((idx - ((totalAtLevel - 1) / 2)) * verticalSpacing * 0.5);
+            }
+
+            const mapped: SVGNode = { ...node, x, y, level, parent };
+            nodes.push(mapped);
+
+            if (expandedNodes.has(node.id)) {
+                node.children?.forEach(c => traverse(c, level + 1, mapped));
+            }
+            return mapped;
+        };
+
+        traverse(data, 0);
+        return nodes;
+    }, [data, dimensions, expandedNodes]);
 
     // Handle Pan/Zoom
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
         const delta = e.deltaY * -0.001;
-        setScale(s => Math.min(Math.max(0.4, s + delta), 2.5));
+        setScale(s => Math.min(Math.max(0.3, s + delta), 2.5));
     };
 
     const handlePointerDown = (e: React.PointerEvent) => {
@@ -123,7 +143,7 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
 
     const handlePointerUp = () => setIsDragging(false);
 
-    // active path set
+    // Active path tracing
     const activePathSet = useMemo(() => {
         const set = new Set<string>();
         if (!activeNodeId) return set;
@@ -138,7 +158,7 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
     return (
         <div
             ref={containerRef}
-            className="w-full h-full bg-void overflow-hidden relative touch-none select-none cursor-grab active:cursor-grabbing"
+            className="w-full h-full bg-void overflow-hidden relative touch-none select-none cursor-grab active:cursor-grabbing font-sans"
             onWheel={handleWheel}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -147,70 +167,87 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
         >
             <motion.div
                 className="w-full h-full origin-top-left"
-                style={{
-                    x: pan.x,
-                    y: pan.y,
-                    scale: scale,
-                }}
+                style={{ x: pan.x, y: pan.y, scale: scale }}
             >
-                <svg width="4000" height="4000" className="absolute inset-0 pointer-events-none overflow-visible">
+                <svg width="6000" height="6000" className="absolute inset-0 pointer-events-none overflow-visible">
                     <defs>
                         <linearGradient id="rootGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stopColor="var(--color-brand)" />
                             <stop offset="100%" stopColor="var(--color-brand-dim)" />
                         </linearGradient>
                     </defs>
-
-                    {/* Draw Edges */}
-                    {layoutNodes.map(node => (
-                        node.parent && (
-                            <MindMapEdge
-                                key={`edge-${node.parent.id}-${node.id}`}
-                                source={node.parent}
-                                target={node}
-                                isActive={activePathSet.has(node.id) && activePathSet.has(node.parent.id)}
-                            />
-                        )
-                    ))}
+                    <AnimatePresence>
+                        {layoutNodes.map(node => (
+                            node.parent && (
+                                <MindMapEdge
+                                    key={`edge-${node.parent.id}-${node.id}`}
+                                    source={node.parent}
+                                    target={node}
+                                    isActive={activePathSet.has(node.id) && activePathSet.has(node.parent.id)}
+                                />
+                            )
+                        ))}
+                    </AnimatePresence>
                 </svg>
 
-                {/* Draw HTML Nodes (easier for text wrapping and hover states than SVG text) */}
-                {layoutNodes.map((node, i) => {
-                    const isActive = activeNodeId === node.id;
-                    const isRoot = node.level === 0;
-                    const w = isRoot ? 200 : node.level === 1 ? 160 : 130;
-                    const h = isRoot ? 64 : node.level === 1 ? 56 : 48;
+                <AnimatePresence>
+                    {layoutNodes.map((node) => {
+                        const isActive = activeNodeId === node.id;
+                        const isRoot = node.level === 0;
+                        const w = isRoot ? 240 : node.level === 1 ? 180 : 160;
+                        const h = isRoot ? 72 : node.level === 1 ? 64 : 56;
+                        const hasChildren = node.children && node.children.length > 0;
+                        const isExpanded = expandedNodes.has(node.id);
 
-                    return (
-                        <motion.button
-                            key={node.id}
-                            initial={{ opacity: 0, scale: 0.8, x: node.x - w / 2 - 20, y: node.y - h / 2 }}
-                            animate={{ opacity: 1, scale: isActive ? 1.05 : 1, x: node.x - w / 2, y: node.y - h / 2 }}
-                            transition={{ delay: i * 0.04, type: 'spring', stiffness: 300, damping: 24 }}
-                            onClick={(e) => { e.stopPropagation(); onNodeSelect(node); }}
-                            className={`absolute flex items-center justify-center p-3 text-center transition-all shadow-sm ${isRoot
-                                    ? 'bg-[url(#rootGrad)] bg-brand text-white rounded-full border-none shadow-[var(--shadow-glow-brand)] z-20'
-                                    : node.level === 1
-                                        ? 'bg-raised border border-border text-ink rounded-xl hover:border-brand-dim z-10'
-                                        : 'bg-surface border border-border-subtle text-ink-2 rounded-full hover:border-brand-dim hover:text-ink z-0'
-                                } ${isActive && !isRoot ? 'ring-2 ring-brand ring-offset-2 ring-offset-void glow-brand bg-surface' : ''}`}
-                            style={{ width: w, height: h }}
-                        >
-                            <span className={`leading-tight line-clamp-2 ${isRoot ? 'font-bold text-sm tracking-tight' : 'font-medium text-xs'}`}>
-                                {node.title}
-                            </span>
-                        </motion.button>
-                    );
-                })}
+                        return (
+                            <motion.div
+                                key={node.id}
+                                layoutId={`node-${node.id}`}
+                                initial={{ opacity: 0, scale: 0.5, x: (node.parent?.x || node.x) - w / 2, y: (node.parent?.y || node.y) - h / 2 }}
+                                animate={{ opacity: 1, scale: isActive ? 1.05 : 1, x: node.x - w / 2, y: node.y - h / 2 }}
+                                exit={{ opacity: 0, scale: 0.5, x: (node.parent?.x || node.x) - w / 2, y: (node.parent?.y || node.y) - h / 2 }}
+                                transition={{ type: 'spring', stiffness: 350, damping: 28, mass: 0.8 }}
+                                onClick={(e) => { e.stopPropagation(); onNodeSelect(node); }}
+                                className={`absolute flex items-center p-4 cursor-pointer transition-all shadow-md group ${isRoot
+                                        ? 'bg-[url(#rootGrad)] text-white rounded-3xl border border-white/10 shadow-brand/20 z-30'
+                                        : node.level === 1
+                                            ? 'bg-surface border border-border text-ink rounded-2xl hover:border-brand-dim hover:shadow-lg z-20'
+                                            : 'bg-void border border-border-subtle text-ink-2 rounded-2xl hover:border-brand-dim hover:text-ink z-10'
+                                    } ${isActive && !isRoot ? 'ring-2 ring-brand ring-offset-2 ring-offset-void drop-shadow-lg bg-raised' : ''}`}
+                                style={{ width: w, height: h }}
+                            >
+                                <div className="flex-1 min-w-0 pr-2">
+                                    <span className={`block truncate leading-snug ${isRoot ? 'font-bold text-base tracking-tight drop-shadow-md' : 'font-semibold text-sm'}`}>
+                                        {node.title}
+                                    </span>
+                                    {node.level === 1 && <span className="text-[10px] uppercase font-bold text-ink-3 mt-1 tracking-widest block opacity-70">Chapter {node.id}</span>}
+                                </div>
+
+                                {/* Expand / Collapse UI */}
+                                {hasChildren && (
+                                    <button
+                                        onClick={(e) => toggleExpand(node.id, e)}
+                                        className={`absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center border font-bold text-xs transition-all ${isExpanded
+                                                ? 'bg-surface border-border text-ink-2 hover:text-brand'
+                                                : 'bg-brand text-white border-brand shadow-md glow-brand hover:bg-white hover:text-brand'
+                                            }`}
+                                    >
+                                        {isExpanded ? '−' : '+'}
+                                    </button>
+                                )}
+                            </motion.div>
+                        );
+                    })}
+                </AnimatePresence>
             </motion.div>
 
-            {/* Controls */}
-            <div className="absolute bottom-6 right-6 flex items-center gap-1 bg-surface border border-border p-1 rounded-lg shadow-lg">
-                <button onClick={() => setScale(s => Math.max(0.4, s - 0.2))} className="w-8 h-8 rounded-md hover:bg-raised text-ink-2 flex items-center justify-center">−</button>
-                <div className="w-px h-4 bg-border mx-1" />
-                <button onClick={() => { setScale(1); setPan({ x: 50, y: dimensions.h / 2 - 400 }); }} className="px-3 h-8 text-xs font-bold text-ink hover:text-brand transition-colors">FIT</button>
-                <div className="w-px h-4 bg-border mx-1" />
-                <button onClick={() => setScale(s => Math.min(2.5, s + 0.2))} className="w-8 h-8 rounded-md hover:bg-raised text-ink-2 flex items-center justify-center">+</button>
+            {/* Floating Navigation Controls */}
+            <div className="absolute bottom-8 right-8 flex items-center gap-1.5 bg-surface/80 backdrop-blur-md border border-border/50 p-1.5 rounded-xl shadow-2xl">
+                <button onClick={() => setScale(s => Math.max(0.3, s - 0.2))} className="w-10 h-10 rounded-lg hover:bg-white/5 text-ink-2 flex items-center justify-center text-lg transition-colors">−</button>
+                <div className="w-px h-5 bg-border mx-1" />
+                <button onClick={() => { setScale(1); setPan({ x: 100, y: dimensions.h / 2 - 400 }); }} className="px-4 h-10 tracking-widest text-[10px] uppercase font-bold text-ink hover:text-brand transition-colors rounded-lg hover:bg-white/5">Re-Center</button>
+                <div className="w-px h-5 bg-border mx-1" />
+                <button onClick={() => setScale(s => Math.min(2.5, s + 0.2))} className="w-10 h-10 rounded-lg hover:bg-white/5 text-ink-2 flex items-center justify-center text-lg transition-colors">+</button>
             </div>
         </div>
     );

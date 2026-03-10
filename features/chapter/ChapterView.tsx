@@ -157,9 +157,9 @@ export const ChapterView: React.FC = () => {
     );
 
     return (
-        <div className="h-[calc(100vh-56px)] w-full flex overflow-hidden bg-void font-sans mt-14">
+        <div className="h-[calc(100vh-56px)] w-full flex flex-col lg:flex-row overflow-hidden bg-void font-sans mt-14">
             {/* ── Left Panel ────────────────────────────────────────────── */}
-            <div className="w-1/2 lg:w-3/5 h-full flex flex-col border-r border-border bg-surface">
+            <div className="w-full lg:w-3/5 h-[45vh] lg:h-full flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-surface shrink-0 lg:shrink">
                 {/* Navbar */}
                 <div className="h-14 flex items-center justify-between px-6 border-b border-border bg-surface/80 backdrop-blur z-20 shrink-0">
                     <div className="flex items-center gap-4">
@@ -168,9 +168,9 @@ export const ChapterView: React.FC = () => {
                         </button>
                         <h1 className="font-bold text-base text-ink line-clamp-1">{chapter.chapterTitle}</h1>
                     </div>
-                    <div className="flex bg-raised rounded-lg p-1 border border-border">
+                    <div className="flex bg-void rounded-lg p-1 border border-border shadow-sm">
                         {(['mindmap', 'summary', 'keywords'] as const).map(tab => (
-                            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-1 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${activeTab === tab ? 'bg-surface text-ink shadow-sm border border-border-subtle' : 'text-ink-3 hover:text-ink-2'}`}>
+                            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-1 text-[11px] font-bold uppercase tracking-widest rounded-md transition-all ${activeTab === tab ? 'bg-brand text-white shadow-md' : 'text-ink-3 hover:text-ink-2 hover:bg-raised'}`}>
                                 {tab}
                             </button>
                         ))}
@@ -215,24 +215,31 @@ export const ChapterView: React.FC = () => {
             </div>
 
             {/* ── Right Panel (Tutor Chat) ──────────────────────────────── */}
-            <div className="w-1/2 lg:w-2/5 h-full flex flex-col bg-void relative">
+            <div className="w-full lg:w-2/5 flex-1 lg:h-full flex flex-col bg-void relative">
                 {/* Chat Header */}
-                <div className="h-14 flex items-center px-6 border-b border-border/50 bg-void/50 backdrop-blur z-20 shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-brand glow-brand mr-3 animate-pulse" />
-                    <span className="font-bold text-sm text-ink tracking-tight">ALUCIDATE <span className="opacity-50">Tutor</span></span>
+                <div className="h-14 flex items-center justify-between px-6 border-b border-border shadow-sm bg-surface/90 backdrop-blur z-20 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="relative flex items-center justify-center w-6 h-6 rounded-md bg-brand/10 border border-brand/20">
+                            <div className="w-1.5 h-1.5 rounded-full bg-brand glow-brand animate-pulse" />
+                        </div>
+                        <span className="font-bold text-sm text-ink tracking-tight uppercase">Tutor</span>
+                    </div>
+                    <span className="text-[10px] text-ink-3 font-mono font-bold uppercase tracking-widest border border-border px-2 py-0.5 rounded shadow-sm">GPT-4 Class</span>
                 </div>
 
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
                     {chatHistory.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-                            <div className="w-16 h-16 rounded-full bg-surface border border-border flex items-center justify-center text-2xl mb-6 shadow-sm">🧠</div>
-                            <h3 className="font-[Instrument_Serif] text-2xl font-bold text-ink mb-2">Hello, {user.name.split(' ')[0]}</h3>
-                            <p className="text-sm text-ink-3 mb-8">What would you like to explore in {chapter.chapterTitle}?</p>
+                            <div className="w-16 h-16 rounded-2xl bg-surface border border-border/50 flex items-center justify-center mb-6 shadow-xl shadow-brand/5">
+                                <svg className="w-8 h-8 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                            </div>
+                            <h3 className="font-[Instrument_Serif] text-3xl text-ink mb-2 tracking-tight">Hello, {user.name.split(' ')[0]}</h3>
+                            <p className="text-sm text-ink-3 mb-8">Concept mastery starts with a single question.</p>
                             <div className="w-full space-y-2 text-left">
                                 {["Give me an overview of this chapter.", "Explain the most difficult concept simply.", "Generate a 3-question quiz."].map((p, i) => (
-                                    <button key={i} onClick={() => handleSend(p)} className="w-full p-3 bg-surface border border-border rounded-xl text-xs text-ink-2 hover:border-brand hover:text-brand transition-all flex items-center gap-3 group">
-                                        <span className="text-brand/50 group-hover:text-brand transition-colors">→</span>
+                                    <button key={i} onClick={() => handleSend(p)} className="w-full p-3.5 bg-surface border border-border rounded-xl text-xs font-medium text-ink-2 hover:border-brand/40 hover:shadow-[0_2px_12px_rgba(var(--color-brand),0.05)] transition-all flex items-center gap-3 group">
+                                        <div className="w-6 h-6 rounded flex items-center justify-center bg-raised text-brand/50 group-hover:text-brand transition-colors">→</div>
                                         {p}
                                     </button>
                                 ))}
@@ -240,7 +247,7 @@ export const ChapterView: React.FC = () => {
                         </div>
                     ) : chatHistory.map(m => (
                         <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[85%] rounded-2xl p-4 md:p-5 ${m.role === 'user' ? 'bg-brand text-white' : 'bg-surface border border-border/50 text-ink'}`}>
+                            <div className={`max-w-[85%] rounded-3xl p-5 shadow-sm ${m.role === 'user' ? 'bg-brand text-white shadow-brand/10 rounded-br-sm' : 'bg-surface border border-border/60 text-ink rounded-bl-sm'}`}>
                                 {m.role === 'user' ? (
                                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
                                 ) : m.status === 'typing' ? (
@@ -267,21 +274,21 @@ export const ChapterView: React.FC = () => {
                 </div>
 
                 {/* Input */}
-                <div className="p-4 sm:p-6 bg-void border-t border-border/30">
-                    <form onSubmit={e => { e.preventDefault(); handleSend(); }} className="flex items-end gap-2 bg-surface border border-border rounded-2xl p-2 shadow-sm focus-within:ring-2 focus-within:ring-brand focus-within:border-brand transition-all">
+                <div className="p-4 sm:p-6 bg-void shrink-0 pb-safe border-t border-border/30">
+                    <form onSubmit={e => { e.preventDefault(); handleSend(); }} className="flex items-end gap-3 bg-surface border border-border rounded-[24px] p-2 pl-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)] focus-within:ring-2 focus-within:ring-brand/30 focus-within:border-brand transition-all relative">
                         <textarea
                             value={input}
                             onChange={e => setInput(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                            placeholder="Message ALUCIDATE Tutor..."
-                            className="flex-1 max-h-32 min-h-[44px] bg-transparent text-sm text-ink placeholder:text-ink-3 resize-none outline-none py-3 px-3"
+                            placeholder="Ask ALUCIDATE Tutor anything..."
+                            className="flex-1 max-h-32 min-h-[44px] bg-transparent text-sm text-ink placeholder:text-ink-3 resize-none outline-none py-3"
                             rows={1}
                         />
-                        <button type="submit" disabled={!input.trim()} className="bg-brand hover:bg-brand-dim text-white disabled:bg-surface disabled:text-ink-3 disabled:border-border transition-all w-11 h-11 flex items-center justify-center shrink-0 rounded-xl disabled:shadow-none">
-                            <svg className="w-5 h-5 translate-x-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" /></svg>
+                        <button type="submit" disabled={!input.trim()} className="absolute right-2 bottom-2 bg-brand hover:bg-brand-dim text-white disabled:bg-raised disabled:text-ink-3 disabled:border-border transition-all w-10 h-10 flex items-center justify-center shrink-0 rounded-full disabled:shadow-none shadow-brand/20">
+                            <svg className="w-4 h-4 translate-x-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" /></svg>
                         </button>
                     </form>
-                    <p className="text-center text-[10px] text-ink-3 mt-3">ALUCIDATE AI can make mistakes. Verify important information.</p>
+                    <p className="text-center text-[10px] text-ink-3 mt-3">Alucidate AI may produce inaccurate information about people, places, or facts.</p>
                 </div>
             </div>
         </div>
