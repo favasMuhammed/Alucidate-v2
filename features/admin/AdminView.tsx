@@ -32,6 +32,7 @@ export const AdminView: React.FC = () => {
     const [processStep, setProcessStep] = useState(0);
     const [processError, setProcessError] = useState('');
     const [processProgress, setProcessProgress] = useState(0);
+    const [processQueueText, setProcessQueueText] = useState('');
 
     // Phase 7: Class Management
     const [classes, setClasses] = useState<Class[]>([]);
@@ -187,46 +188,69 @@ export const AdminView: React.FC = () => {
     };
 
 
-    const processAndSave = async (file: File) => {
-        if (!activeSubject) return;
-        setIsProcessing(true);
-        setProcessStep(1);
-        setProcessError('');
-        setProcessProgress(0);
-        try {
-            const fileBuffer = await file.arrayBuffer();
-            const fileBase64 = btoa(new Uint8Array(fileBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-            const pdf = await pdfjsLib.getDocument({ data: fileBuffer }).promise;
-            await dbService.savePdfToCache(file.name, fileBase64, pdf.numPages);
-            setProcessProgress(25);
-            setProcessStep(2);
-            const chapterNum = (activeSubject.structure?.children?.length || 0) + 1;
-            const generatedDetails = await generateChapterDetails_Interactive({ fileName: file.name, fileBase64, totalPages: pdf.numPages }, chapterNum);
-            setProcessProgress(75);
-            setProcessStep(4);
-            const chapterDetails: ChapterDetails = { ...generatedDetails, id: crypto.randomUUID(), subjectId: activeSubject.id, chapterId: chapterNum.toString() };
-            const newChapterNode = { id: chapterDetails.chapterId, title: chapterDetails.chapterTitle, fileName: file.name, startPage: 1, endPage: pdf.numPages, children: [] };
-            const updatedSubject = { ...activeSubject };
-            if (!updatedSubject.structure) updatedSubject.structure = { id: 'root', title: updatedSubject.subject, children: [], startPage: 0, endPage: 0, fileName: '' };
-            if (!updatedSubject.structure.children) updatedSubject.structure.children = [];
-            updatedSubject.structure.children.push(newChapterNode as any);
-            await dbService.saveSubject(updatedSubject);
-            await dbService.saveChapterDetails(chapterDetails);
-            setProcessProgress(100);
-            setProcessStep(5);
-            await loadSubjects();
-            setTimeout(() => { setIsProcessing(false); setProcessStep(0); setActiveTab('chapters'); }, 2000);
-        } catch (err: any) {
-            setProcessError(err.message || 'Failed to process file');
-            setProcessStep(0);
-            setIsProcessing(false);
-        }
-    };
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0 || !activeSubject) return;
+        const files = Array.from(e.target.files);
+        e.target.value = ''; // Reset input visually
 
-    const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || e.target.files.length === 0) return;
-        processAndSave(e.target.files[0]);
-        e.target.value = '';
+        setIsProcessing(true);
+        let currentSubject = activeSubject;
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            setProcessQueueText(`(${i + 1} of ${files.length}): ${file.name}`);
+
+            setProcessStep(1);
+            setProcessError('');
+            setProcessProgress(0);
+
+            try {
+                const fileBuffer = await file.arrayBuffer();
+                const fileBase64 = btoa(new Uint8Array(fileBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+                const pdf = await pdfjsLib.getDocument({ data: fileBuffer }).promise;
+                await dbService.savePdfToCache(file.name, fileBase64, pdf.numPages);
+
+                setProcessProgress(25);
+                setProcessStep(2);
+
+                const chapterNum = (currentSubject.structure?.children?.length || 0) + 1;
+                const generatedDetails = await generateChapterDetails_Interactive({ fileName: file.name, fileBase64, totalPages: pdf.numPages }, chapterNum);
+
+                setProcessProgress(75);
+                setProcessStep(4);
+
+                const chapterDetails: ChapterDetails = { ...generatedDetails, id: crypto.randomUUID(), subjectId: currentSubject.id, chapterId: chapterNum.toString() };
+                const newChapterNode = { id: chapterDetails.chapterId, title: chapterDetails.chapterTitle, fileName: file.name, startPage: 1, endPage: pdf.numPages, children: [] };
+
+                const updatedSubject = { ...currentSubject };
+                if (!updatedSubject.structure) updatedSubject.structure = { id: 'root', title: updatedSubject.subject, children: [], startPage: 0, endPage: 0, fileName: '' };
+                if (!updatedSubject.structure.children) updatedSubject.structure.children = [];
+                updatedSubject.structure.children.push(newChapterNode as any);
+
+                await dbService.saveSubject(updatedSubject);
+                await dbService.saveChapterDetails(chapterDetails);
+
+                setProcessProgress(100);
+                setProcessStep(5);
+
+                currentSubject = updatedSubject; // Roll latest subject state forward for next file
+
+            } catch (err: any) {
+                setProcessError(`Failed on ${file.name}: ` + (err.message || 'Unknown error'));
+                setProcessStep(0);
+                await new Promise(r => setTimeout(r, 2000)); // Pause so user sees error
+            }
+        }
+
+        await loadSubjects(); // Refresh global React state once at the very end
+
+        setTimeout(() => {
+            setIsProcessing(false);
+            setProcessStep(0);
+            setActiveTab('chapters');
+            setProcessQueueText('');
+            setProcessError('');
+        }, 1500);
     };
 
     const handleDeleteSubject = async (id: string) => {
@@ -246,7 +270,7 @@ export const AdminView: React.FC = () => {
                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                 </div>
                 <div>
-                    <h3 className="text-ink font-bold">Processing Document</h3>
+                    <h3 className="text-ink font-bold">Processing {processQueueText ? `Queue ${processQueueText}` : 'Document'}</h3>
                     <p className="text-sm text-ink-2">Please do not navigate away.</p>
                 </div>
             </div>
@@ -395,7 +419,7 @@ export const AdminView: React.FC = () => {
                                 ) : activeTab === 'upload' ? (
                                     <motion.div key="upload" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl">
                                         <label className="group relative w-full h-[320px] bg-surface hover:bg-surface border-2 border-dashed border-border hover:border-brand rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300">
-                                            <input type="file" accept="application/pdf" className="hidden" onChange={handleUpload} />
+                                            <input type="file" accept="application/pdf" multiple className="hidden" onChange={handleUpload} />
                                             <div className="absolute inset-0 bg-brand/0 group-hover:bg-brand/5 transition-colors rounded-3xl" />
                                             <div className="w-20 h-20 mb-6 bg-raised border border-border rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 group-hover:shadow-[var(--shadow-glow-brand)] transition-all">📄</div>
                                             <h3 className="text-xl font-bold text-ink mb-2">Drop textbook PDF here</h3>
