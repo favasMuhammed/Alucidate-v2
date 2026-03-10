@@ -363,7 +363,7 @@ export const AdminView: React.FC = () => {
     );
 
     return (
-        <div className="h-[calc(100vh-56px)] mt-14 flex w-full max-w-[1280px] mx-auto bg-void text-ink font-sans">
+        <div className="h-[calc(100vh-56px)] flex w-full max-w-[1280px] mx-auto bg-void text-ink font-sans">
             {/* ── Sidebar ── */}
             <aside className="w-[280px] border-r border-border flex flex-col pt-6 pb-4 shrink-0">
                 <div className="px-6 mb-4 flex flex-col gap-3">

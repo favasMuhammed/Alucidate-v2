@@ -158,7 +158,7 @@ export const ChapterView: React.FC = () => {
     );
 
     return (
-        <div className="h-[calc(100vh-56px)] w-full flex flex-col lg:flex-row overflow-hidden bg-void font-sans mt-14">
+        <div className="h-[calc(100vh-56px)] w-full flex flex-col lg:flex-row overflow-hidden bg-void font-sans">
             {/* ── Left Panel ────────────────────────────────────────────── */}
             <div className={`w-full ${isChatOpen ? 'lg:w-3/5' : 'lg:w-full'} h-[45vh] lg:h-full flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-surface shrink-0 lg:shrink transition-all duration-300 ease-in-out`}>
                 {/* Navbar */}

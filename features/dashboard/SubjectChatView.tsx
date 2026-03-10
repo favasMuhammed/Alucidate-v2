@@ -141,7 +141,7 @@ export const SubjectChatView: React.FC = () => {
     if (!subject) return <div className="p-20 text-center">Subject not found.</div>;
 
     return (
-        <div className="h-[calc(100vh-56px)] w-full flex flex-col bg-void font-sans mt-14 overflow-hidden">
+        <div className="h-[calc(100vh-56px)] w-full flex flex-col bg-void font-sans overflow-hidden">
             {/* Header */}
             <div className="h-14 flex items-center justify-between px-6 border-b border-border bg-surface/80 backdrop-blur z-20 shrink-0">
                 <div className="flex items-center gap-4">
