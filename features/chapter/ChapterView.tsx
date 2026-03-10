@@ -59,7 +59,15 @@ export const ChapterView: React.FC = () => {
     const [selectedNode, setSelectedNode] = useState<NodeType | null>(null);
     const [layout, setLayout] = useState<'split' | 'left' | 'right'>('split');
     const [mobileView, setMobileView] = useState<'content' | 'chat'>('content');
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
     const chatEndRef = useRef<HTMLDivElement>(null);
+
+    // Track window resize for layout switches
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 1024);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Load subject, chapter, and conversation history
     useEffect(() => {
@@ -100,7 +108,7 @@ export const ChapterView: React.FC = () => {
         setSelectedNode(node);
         if (!input) setInput(`Explain "${node.title}" in the context of this chapter.`);
         // On mobile, automatically show chat when a node is selected to see the answer
-        if (window.innerWidth < 1024) setMobileView('chat');
+        if (isMobile) setMobileView('chat');
     };
 
     const handleSend = async (text: string = input) => {
@@ -166,17 +174,17 @@ export const ChapterView: React.FC = () => {
             <div className={`w-full ${layout === 'left' ? 'lg:w-full' : layout === 'right' ? 'hidden lg:hidden' : 'lg:w-3/5'} ${mobileView === 'chat' ? 'hidden lg:flex' : 'flex'} h-full flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-surface shrink-0 lg:shrink transition-all duration-300 ease-in-out`}>
                 {/* Navbar */}
                 <div className="h-14 flex items-center justify-between px-6 border-b border-border bg-surface/80 backdrop-blur z-20 shrink-0">
-                    <div className="flex items-center gap-3 sm:gap-4 overflow-hidden">
+                    <div className="flex items-center gap-2 sm:gap-4 overflow-hidden py-1">
                         <button onClick={() => navigate(`/subject/${subjectId}`)} className="p-1.5 rounded-lg hover:bg-raised text-ink-3 hover:text-ink transition-colors shrink-0">
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                         </button>
-                        <h1 className="font-bold text-sm sm:text-base text-ink line-clamp-1 leading-tight">{chapter.chapterTitle}</h1>
+                        <h1 className="font-bold text-xs sm:text-base text-ink line-clamp-2 leading-tight py-0.5">{chapter.chapterTitle}</h1>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className="flex bg-void rounded-lg p-1 border border-border shadow-sm">
+                        <div className="flex bg-void rounded-lg p-0.5 sm:p-1 border border-border shadow-sm shrink-0">
                             {(['mindmap', 'summary', 'keywords'] as const).map(tab => (
-                                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-1 text-[11px] font-bold uppercase tracking-widest rounded-md transition-all ${activeTab === tab ? 'bg-brand text-white shadow-md' : 'text-ink-3 hover:text-ink-2 hover:bg-raised'}`}>
-                                    {tab}
+                                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-2 sm:px-4 py-1 text-[9px] sm:text-[11px] font-bold uppercase tracking-wider sm:tracking-widest rounded-md transition-all ${activeTab === tab ? 'bg-brand text-white shadow-md' : 'text-ink-3 hover:text-ink-2 hover:bg-raised'}`}>
+                                    {tab === 'mindmap' && isMobile ? 'Map' : tab}
                                 </button>
                             ))}
                         </div>
@@ -234,11 +242,11 @@ export const ChapterView: React.FC = () => {
 
             {/* ── Right Panel (Tutor Chat) ──────────────────────────────── */}
             <AnimatePresence>
-                {(layout !== 'left' || window.innerWidth < 1024) && (
+                {(layout !== 'left' || isMobile) && (
                     <motion.div
-                        initial={window.innerWidth < 1024 ? { opacity: 0 } : { opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: window.innerWidth < 1024 ? '100%' : (layout === 'right' ? '100%' : '40%') }}
-                        exit={window.innerWidth < 1024 ? { opacity: 0 } : { opacity: 0, width: 0 }}
+                        initial={isMobile ? { opacity: 0 } : { opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: isMobile ? '100%' : (layout === 'right' ? '100%' : '40%') }}
+                        exit={isMobile ? { opacity: 0 } : { opacity: 0, width: 0 }}
                         transition={{ duration: 0.3, ease: 'easeInOut' }}
                         className={`w-full ${layout === 'right' ? 'lg:w-full' : 'lg:w-2/5'} ${mobileView === 'content' ? 'hidden lg:flex' : 'flex'} flex-1 h-full flex flex-col bg-void relative overflow-hidden shrink-0 border-t lg:border-t-0 border-border`}
                     >
