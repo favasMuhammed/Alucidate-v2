@@ -114,7 +114,7 @@ export const generateChapterDetails_Interactive = async (
     chapterPdfFile: FileContent,
     chapterNumber: number
 ): Promise<Omit<ChapterDetails, 'id' | 'subjectId' | 'chapterId'>> => {
-    const model = "gemini-2.5-pro";
+    const model = "gemini-2.5-flash";
     const systemInstruction = `You are an expert academic assistant. The user has provided a PDF containing a single chapter. Your task is to generate a comprehensive, interactive learning module for it.
 
     Instructions:
@@ -239,7 +239,7 @@ export const analyzeFiles = async (
     conversationHistory: ConversationTurn[],
     chapterContext?: { chapterTitle: string; chapterId: string; pageOffset: number; mindMap?: MindMapNode; }
 ): Promise<TutorResponse> => {
-    const model = "gemini-2.5-pro";
+    const model = "gemini-2.5-flash";
 
     // Vectorless RAG Step: If mindMap is provided, identify high-density sections first
     let focusedContext = "";
