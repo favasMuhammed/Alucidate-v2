@@ -104,14 +104,29 @@ export const AdminView: React.FC = () => {
 
     const handleCreateClass = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newClassName.trim()) return;
+        const trimmedName = newClassName.trim();
+        if (!trimmedName) return;
+        if (classes.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
+            alert('A class with this name already exists.');
+            return;
+        }
         try {
             await dbService.saveClass({
                 id: crypto.randomUUID(),
-                name: newClassName.trim(),
+                name: trimmedName,
                 type: newClassType
             });
             setNewClassName('');
+            loadClasses();
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const quickAddClass = async (name: string, type: 'class' | 'entrance') => {
+        if (classes.some(c => c.name.toLowerCase() === name.toLowerCase())) return;
+        try {
+            await dbService.saveClass({ id: crypto.randomUUID(), name, type });
             loadClasses();
         } catch (err) {
             console.error(err);
@@ -389,6 +404,26 @@ export const AdminView: React.FC = () => {
                                 </div>
                                 <button type="submit" className="h-11 bg-brand text-void px-8 rounded-xl font-bold hover:bg-brand-dim transition-all">ADD CLASS</button>
                             </form>
+
+                            <div className="mb-8 p-6 bg-surface border border-border rounded-2xl">
+                                <h2 className="text-xs font-bold text-ink-3 uppercase mb-3">Quick Add: Regular Classes</h2>
+                                <div className="flex flex-wrap gap-2 mb-6">
+                                    {['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'].map(c => (
+                                        <button key={c} onClick={() => quickAddClass(c, 'class')} disabled={classes.some(existing => existing.name === c)} className="px-3 py-1.5 text-xs font-bold bg-void border border-border rounded-lg hover:border-brand hover:text-brand disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-ink-2">
+                                            {c}
+                                        </button>
+                                    ))}
+                                </div>
+                                <h2 className="text-xs font-bold text-ink-3 uppercase mb-3">Quick Add: Entrance Exams</h2>
+                                <div className="flex flex-wrap gap-2">
+                                    {['NEET', 'JEE Main', 'JEE Advanced', 'CUET', 'NDA'].map(c => (
+                                        <button key={c} onClick={() => quickAddClass(c, 'entrance')} disabled={classes.some(existing => existing.name === c)} className="px-3 py-1.5 text-xs font-bold bg-void border border-border rounded-lg hover:border-purple hover:text-purple disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-ink-2">
+                                            {c}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {classes.map(c => (
