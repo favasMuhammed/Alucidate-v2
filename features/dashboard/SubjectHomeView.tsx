@@ -142,8 +142,8 @@ export const SubjectHomeView: React.FC = () => {
                                 className="relative group"
                             >
                                 <div className="absolute inset-0 bg-surface scale-x-0 origin-left group-hover:scale-x-100 transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] rounded-2xl border border-transparent group-hover:border-border-subtle" />
-                                <div className={`relative z-10 p-5 pl-6 flex items-center justify-between transition-all ${ch.isLocked ? 'opacity-50' : ''}`}>
-                                    <div className="flex items-center gap-5 min-w-0 pr-6">
+                                <div className={`relative z-10 p-5 pl-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${ch.isLocked ? 'opacity-50' : ''}`}>
+                                    <div className="flex items-center gap-5 min-w-0 pr-0 sm:pr-6">
                                         <span className="text-xl font-mono font-bold text-ink-3 shrink-0">{String(i + 1).padStart(2, '0')}</span>
                                         <div className="min-w-0">
                                             <h3 className="text-lg font-bold text-ink truncate">{ch.chapterTitle}</h3>
@@ -160,7 +160,7 @@ export const SubjectHomeView: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="shrink-0 flex items-center gap-4">
+                                    <div className="shrink-0 flex items-center justify-end sm:justify-start gap-4">
                                         {ch.isCompleted && (
                                             <motion.div
                                                 initial={{ scale: 0 }}
