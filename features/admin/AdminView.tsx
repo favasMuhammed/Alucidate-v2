@@ -206,7 +206,15 @@ export const AdminView: React.FC = () => {
 
             try {
                 const fileBuffer = await file.arrayBuffer();
-                const fileBase64 = btoa(new Uint8Array(fileBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+
+                // Use FileReader for high-performance Base64 encoding without blocking the main thread
+                const fileBase64 = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+                    reader.onerror = error => reject(error);
+                    reader.readAsDataURL(file);
+                });
+
                 const pdf = await pdfjsLib.getDocument({ data: fileBuffer }).promise;
                 await dbService.savePdfToCache(file.name, fileBase64, pdf.numPages);
 
