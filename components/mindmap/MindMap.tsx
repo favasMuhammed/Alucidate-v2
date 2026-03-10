@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { MindMapNode as MindMapNodeType } from '@/types';
 
 interface SVGNode extends MindMapNodeType {
@@ -30,7 +30,10 @@ const MindMapEdge: React.FC<{ source: SVGNode; target: SVGNode; isActive: boolea
             strokeWidth={isActive ? 2.5 : 1.5}
             initial={{ pathLength: 0, opacity: 0 }}
             animate={{ pathLength: 1, opacity: 1, d: path }}
-            transition={{ duration: 0.6, type: 'spring', bounce: 0.2 }}
+            transition={{
+                d: { type: 'spring', stiffness: 100, damping: 20 },
+                pathLength: { duration: 0.8, ease: "easeOut" }
+            }}
             className={isActive ? 'drop-shadow-[var(--shadow-glow-brand)]' : ''}
         />
     );
@@ -40,10 +43,16 @@ const MindMapEdge: React.FC<{ source: SVGNode; target: SVGNode; isActive: boolea
 export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNodeId }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ w: 1000, h: 800 });
-    const [scale, setScale] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    const startPanParams = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
+
+    // ── Liquid Pan State (Physics-driven) ──
+    const panX = useMotionValue(100);
+    const panY = useMotionValue(0);
+    const springPanX = useSpring(panX, { stiffness: 150, damping: 25, mass: 0.5 });
+    const springPanY = useSpring(panY, { stiffness: 150, damping: 25, mass: 0.5 });
+
+    // ── Liquid Scale State (Spring-driven) ──
+    const [targetScale, setTargetScale] = useState(1);
+    const springScale = useSpring(targetScale, { stiffness: 200, damping: 30 });
 
     // ── Expand/Collapse State ──
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
@@ -69,10 +78,12 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
 
     useEffect(() => {
         if (containerRef.current) {
-            setDimensions({ w: containerRef.current.clientWidth, h: containerRef.current.clientHeight });
-            setPan({ x: 100, y: containerRef.current.clientHeight / 2 - 400 });
+            const h = containerRef.current.clientHeight;
+            setDimensions({ w: containerRef.current.clientWidth, h });
+            panX.set(100);
+            panY.set(h / 2 - 400);
         }
-    }, [data]);
+    }, [data, panX, panY]);
 
     // ── Dynamic Layout Engine ──
     const layoutNodes = useMemo(() => {
@@ -121,27 +132,23 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
         return nodes;
     }, [data, dimensions, expandedNodes]);
 
-    // Handle Pan/Zoom
+    // Handle Zoom with Spring
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
-        const delta = e.deltaY * -0.001;
-        setScale(s => Math.min(Math.max(0.3, s + delta), 2.5));
+        const delta = e.deltaY * -0.002; // Slightly more sensitive for effortlessness
+        setTargetScale(s => Math.min(Math.max(0.3, s + delta), 2.5));
     };
 
-    const handlePointerDown = (e: React.PointerEvent) => {
-        setIsDragging(true);
-        startPanParams.current = { x: pan.x, y: pan.y, startX: e.clientX, startY: e.clientY };
-    };
-
-    const handlePointerMove = (e: React.PointerEvent) => {
-        if (!isDragging) return;
-        setPan({
-            x: startPanParams.current.x + (e.clientX - startPanParams.current.startX),
-            y: startPanParams.current.y + (e.clientY - startPanParams.current.startY)
-        });
-    };
-
-    const handlePointerUp = () => setIsDragging(false);
+    // Gliding Auto-Center
+    useEffect(() => {
+        if (!activeNodeId) return;
+        const activeNode = layoutNodes.find(n => n.id === activeNodeId);
+        if (activeNode) {
+            // Target center with smooth spring glide
+            panX.set((dimensions.w / 2) - activeNode.x * targetScale);
+            panY.set((dimensions.h / 2) - activeNode.y * targetScale);
+        }
+    }, [activeNodeId, layoutNodes, dimensions.w, dimensions.h, targetScale, panX, panY]);
 
     // Active path tracing
     const activePathSet = useMemo(() => {
@@ -160,14 +167,19 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
             ref={containerRef}
             className="w-full h-full bg-void overflow-hidden relative touch-none select-none cursor-grab active:cursor-grabbing font-sans"
             onWheel={handleWheel}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
         >
             <motion.div
+                drag
+                dragMomentum={true}
+                dragElastic={0.05}
+                dragTransition={{ power: 0.2, timeConstant: 200 }}
+                onDrag={(_, info) => {
+                    // Sync motion values for centering logic
+                    panX.set(panX.get() + info.delta.x);
+                    panY.set(panY.get() + info.delta.y);
+                }}
                 className="w-full h-full origin-top-left"
-                style={{ x: pan.x, y: pan.y, scale: scale }}
+                style={{ x: springPanX, y: springPanY, scale: springScale }}
             >
                 <svg width="6000" height="6000" className="absolute inset-0 pointer-events-none overflow-visible">
                     <defs>
@@ -245,11 +257,11 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
 
             {/* Floating Navigation Controls */}
             <div className="absolute bottom-6 right-6 sm:bottom-8 sm:right-8 flex items-center gap-1 bg-surface/80 backdrop-blur-md border border-border/50 p-1 rounded-xl shadow-2xl z-40">
-                <button onClick={() => setScale(s => Math.max(0.3, s - 0.2))} className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg hover:bg-white/5 text-ink-2 flex items-center justify-center text-lg transition-colors">−</button>
+                <button onClick={() => setTargetScale(s => Math.max(0.3, s - 0.2))} className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg hover:bg-white/5 text-ink-2 flex items-center justify-center text-lg transition-colors">−</button>
                 <div className="w-px h-4 bg-border mx-0.5" />
-                <button onClick={() => { setScale(1); setPan({ x: 100, y: dimensions.h / 2 - 400 }); }} className="px-3 sm:px-4 h-9 sm:h-10 tracking-widest text-[9px] sm:text-[10px] uppercase font-bold text-ink hover:text-brand transition-colors rounded-lg hover:bg-white/5">Re-Center</button>
+                <button onClick={() => { setTargetScale(1); panX.set(100); panY.set(dimensions.h / 2 - 400); }} className="px-3 sm:px-4 h-9 sm:h-10 tracking-widest text-[9px] sm:text-[10px] uppercase font-bold text-ink hover:text-brand transition-colors rounded-lg hover:bg-white/5">Re-Center</button>
                 <div className="w-px h-4 bg-border mx-0.5" />
-                <button onClick={() => setScale(s => Math.min(2.5, s + 0.2))} className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg hover:bg-white/5 text-ink-2 flex items-center justify-center text-lg transition-colors">+</button>
+                <button onClick={() => setTargetScale(s => Math.min(2.5, s + 0.2))} className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg hover:bg-white/5 text-ink-2 flex items-center justify-center text-lg transition-colors">+</button>
             </div>
         </div>
     );

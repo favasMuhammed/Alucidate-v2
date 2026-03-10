@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Class, SubjectData } from '@/types';
 
@@ -441,7 +441,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                                     {otp.map((d, i) => (
                                         <input
                                             key={i}
-                                            ref={el => otpRefs.current[i] = el}
+                                            ref={el => { otpRefs.current[i] = el; }}
                                             type="text"
                                             maxLength={1}
                                             value={d}

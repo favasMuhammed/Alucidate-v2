@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { SubjectData } from '@/types';
 import { dbService } from '@/services/dbService';
@@ -35,20 +35,15 @@ function getGreeting() {
 // ── Components ──────────────────────────────────────────────────────
 
 const AnimatedCounter: React.FC<{ value: number }> = ({ value }) => {
-    const [count, setCount] = useState(0);
+    const count = useMotionValue(0);
+    const rounded = useTransform(count, latest => Math.round(latest));
+    const springCount = useSpring(count, { stiffness: 50, damping: 20 });
+
     useEffect(() => {
-        let start = 0;
-        const end = value;
-        if (start === end) return;
-        const incrementTime = Math.max(16, 1000 / end);
-        const timer = setInterval(() => {
-            start += 1;
-            setCount(start);
-            if (start === end) clearInterval(timer);
-        }, incrementTime);
-        return () => clearInterval(timer);
-    }, [value]);
-    return <span>{count}</span>;
+        springCount.set(value);
+    }, [value, springCount]);
+
+    return <motion.span>{rounded}</motion.span>;
 };
 
 export const DashboardView: React.FC = () => {
@@ -187,18 +182,22 @@ export const DashboardView: React.FC = () => {
                                     key={s.id}
                                     layoutId={`subject-card-${s.id}`}
                                     variants={cardVariants}
-                                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                                    whileHover={{ y: -6, scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
                                     onClick={() => navigate(`/subject/${s.id}`)}
-                                    className="group text-left relative flex flex-col bg-surface border border-border rounded-2xl overflow-hidden shadow-sm hover:border-border-subtle hover:shadow-[var(--shadow-glow-brand)] transition-all duration-300"
+                                    className="group text-left relative flex flex-col bg-surface border border-border rounded-2xl overflow-hidden shadow-sm hover:border-brand/30 hover:shadow-[var(--shadow-glow-brand)] transition-all duration-300 active:shadow-inner"
                                 >
                                     {/* Gradient Band */}
                                     <motion.div
                                         layoutId={`subject-hero-${s.id}`}
-                                        className="h-20 w-full relative z-0"
+                                        className="h-20 w-full relative z-0 overflow-hidden"
                                         style={{ background: gradientParams }}
                                     >
                                         <div className="absolute inset-0 bg-void/10 group-hover:bg-transparent transition-colors" />
-                                        <div className="absolute -bottom-4 left-4 w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center text-xl shadow-sm z-10 group-hover:scale-110 transition-transform">
+                                        {/* Liquid Mesh Shine Overlay */}
+                                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-tr from-white/10 to-transparent pointer-events-none" />
+
+                                        <div className="absolute -bottom-4 left-4 w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center text-xl shadow-sm z-10 group-hover:scale-110 transition-transform group-hover:shadow-lg">
                                             📚
                                         </div>
                                     </motion.div>

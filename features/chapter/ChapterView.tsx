@@ -171,7 +171,11 @@ export const ChapterView: React.FC = () => {
     return (
         <div className="h-[calc(100vh-56px)] w-full flex flex-col lg:flex-row overflow-hidden bg-void font-sans">
             {/* ── Left Panel ────────────────────────────────────────────── */}
-            <div className={`w-full ${layout === 'left' ? 'lg:w-full' : layout === 'right' ? 'hidden lg:hidden' : 'lg:w-3/5'} ${mobileView === 'chat' ? 'hidden lg:flex' : 'flex'} h-full flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-surface shrink-0 lg:shrink transition-all duration-300 ease-in-out`}>
+            <motion.div
+                layout
+                transition={{ type: 'spring', stiffness: 200, damping: 30 }}
+                className={`w-full ${layout === 'left' ? 'lg:w-full' : layout === 'right' ? 'hidden lg:hidden' : 'lg:w-3/5'} ${mobileView === 'chat' ? 'hidden lg:flex' : 'flex'} h-full flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-surface shrink-0 lg:shrink transition-width duration-300 ease-in-out`}
+            >
                 {/* Navbar */}
                 <div className="h-14 flex items-center justify-between px-6 border-b border-border bg-surface/80 backdrop-blur z-20 shrink-0">
                     <div className="flex items-center gap-2 sm:gap-4 overflow-hidden py-1">
@@ -181,9 +185,20 @@ export const ChapterView: React.FC = () => {
                         <h1 className="font-bold text-xs sm:text-base text-ink line-clamp-2 leading-tight py-0.5">{chapter.chapterTitle}</h1>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className="flex bg-void rounded-lg p-0.5 sm:p-1 border border-border shadow-sm shrink-0">
+                        <div className="flex bg-void rounded-lg p-0.5 sm:p-1 border border-border shadow-sm shrink-0 relative">
                             {(['mindmap', 'summary', 'keywords'] as const).map(tab => (
-                                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-2 sm:px-4 py-1 text-[9px] sm:text-[11px] font-bold uppercase tracking-wider sm:tracking-widest rounded-md transition-all ${activeTab === tab ? 'bg-brand text-white shadow-md' : 'text-ink-3 hover:text-ink-2 hover:bg-raised'}`}>
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`relative px-2 sm:px-4 py-1 text-[9px] sm:text-[11px] font-bold uppercase tracking-wider sm:tracking-widest rounded-md transition-all z-10 ${activeTab === tab ? 'text-white' : 'text-ink-3 hover:text-ink-2'}`}
+                                >
+                                    {activeTab === tab && (
+                                        <motion.div
+                                            layoutId="activeTab"
+                                            className="absolute inset-0 bg-brand rounded-md shadow-md -z-10"
+                                            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                                        />
+                                    )}
                                     {tab === 'mindmap' && isMobile ? 'Map' : tab}
                                 </button>
                             ))}
@@ -238,16 +253,17 @@ export const ChapterView: React.FC = () => {
                         )}
                     </AnimatePresence>
                 </div>
-            </div>
+            </motion.div>
 
             {/* ── Right Panel (Tutor Chat) ──────────────────────────────── */}
             <AnimatePresence>
                 {(layout !== 'left' || isMobile) && (
                     <motion.div
+                        layout
                         initial={isMobile ? { opacity: 0 } : { opacity: 0, width: 0 }}
                         animate={{ opacity: 1, width: isMobile ? '100%' : (layout === 'right' ? '100%' : '40%') }}
                         exit={isMobile ? { opacity: 0 } : { opacity: 0, width: 0 }}
-                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                        transition={{ type: 'spring', stiffness: 200, damping: 30 }}
                         className={`w-full ${layout === 'right' ? 'lg:w-full' : 'lg:w-2/5'} ${mobileView === 'content' ? 'hidden lg:flex' : 'flex'} flex-1 h-full flex flex-col bg-void relative overflow-hidden shrink-0 border-t lg:border-t-0 border-border`}
                     >
                         {/* Chat Header */}

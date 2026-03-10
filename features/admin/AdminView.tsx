@@ -365,7 +365,7 @@ export const AdminView: React.FC = () => {
     return (
         <div className="h-[calc(100vh-56px)] flex w-full max-w-[1280px] mx-auto bg-void text-ink font-sans">
             {/* ── Sidebar ── */}
-            <aside className="w-[280px] border-r border-border flex flex-col pt-6 pb-4 shrink-0">
+            <aside className="w-[280px] border-r border-border flex flex-col pt-6 pb-4 shrink-0 liquid-glass refraction">
                 <div className="px-6 mb-4 flex flex-col gap-3">
                     <h2 className="text-xs font-bold uppercase tracking-widest text-ink-3">Course Manager</h2>
                     <div className="flex gap-2">
@@ -448,7 +448,7 @@ export const AdminView: React.FC = () => {
             </aside>
 
             {/* ── Main Content ── */}
-            <main className="flex-1 flex flex-col min-w-0 bg-void overflow-hidden">
+            <main className="flex-1 flex flex-col min-w-0 bg-void overflow-hidden refraction">
                 {activeSubject ? (
                     <>
                         <div className="border-b border-border px-8 pt-8 shrink-0">
