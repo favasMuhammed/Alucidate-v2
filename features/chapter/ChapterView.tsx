@@ -131,7 +131,12 @@ export const ChapterView: React.FC = () => {
                 text,
                 relevantFiles,
                 apiHistory,
-                { chapterTitle: chapter.chapterTitle, chapterId: chapter.chapterId, pageOffset: 0 }
+                {
+                    chapterTitle: chapter.chapterTitle,
+                    chapterId: chapter.chapterId,
+                    pageOffset: 0,
+                    mindMap: chapter.mindMap
+                }
             );
 
             const newHistory = [...chatHistory, userMsg, { id: `${msgId}_a`, role: 'assistant' as const, content: parsedRes.answer, parsed: parsedRes, status: 'done' as const, timestamp: Date.now() + 1 }];

@@ -148,15 +148,44 @@ export const generateChapterDetails_Interactive = async (
 };
 
 
+// Identify relevant nodes from a subject's mind map based on a query (Vectorless RAG / PageIndex style)
+export const identifyRelevantNodes = async (
+    query: string,
+    mindMap: MindMapNode,
+    limit: number = 3
+): Promise<string[]> => {
+    const model = "gemini-2.5-flash"; // Use faster model for reasoning
+    const systemInstruction = `You are a document navigation assistant. Given a student's query and a hierarchical MindMap of a textbook, identify the top ${limit} most relevant section IDs (e.g., "1.2.1"). 
+    Focus on finding the exact nodes that would contain the answer. Return only a JSON array of strings.`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: [
+                { text: `Query: "${query}"\n\nMindMap Structure:\n${JSON.stringify(mindMap, null, 2)}` }
+            ],
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING }
+                },
+                systemInstruction: systemInstruction,
+            },
+        });
+        return JSON.parse(response.text.trim());
+    } catch (error) {
+        console.error("Error identifying relevant nodes:", error);
+        return []; // Fallback to no specific nodes
+    }
+};
+
 export const findRelevantFiles = async (
     query: string,
     allSubjectMindMaps: { subjectId: string, mindMap: MindMapNode }[],
     conversationHistory: ConversationTurn[],
     primarySubjectId: string,
 ): Promise<string[]> => {
-    // This function can be simplified if we always use the current subject's books.
-    // For now, we'll just return the primary subject ID to ensure context is maintained.
-    // A more complex implementation could search across subjects if needed.
     return [primarySubjectId];
 };
 
@@ -208,9 +237,20 @@ export const analyzeFiles = async (
     query: string,
     relevantFiles: FileContent[],
     conversationHistory: ConversationTurn[],
-    chapterContext?: { chapterTitle: string; chapterId: string; pageOffset: number; }
+    chapterContext?: { chapterTitle: string; chapterId: string; pageOffset: number; mindMap?: MindMapNode; }
 ): Promise<TutorResponse> => {
     const model = "gemini-2.5-pro";
+
+    // Vectorless RAG Step: If mindMap is provided, identify high-density sections first
+    let focusedContext = "";
+    if (chapterContext?.mindMap) {
+        try {
+            const relevantNodes = await identifyRelevantNodes(query, chapterContext.mindMap);
+            if (relevantNodes.length > 0) {
+                focusedContext = `\nRELEVANT SECTIONS IDENTIFIED: The following chapters/sections in the MindMap are most likely to contain the answer: ${relevantNodes.join(', ')}. Prioritize these sections in the provided PDF.`;
+            }
+        } catch { /* Silent fail, fallback to full document */ }
+    }
 
     const chapterInstruction = chapterContext
         ? `The user is studying Chapter ${chapterContext.chapterId}: "${chapterContext.chapterTitle}". The provided PDF contains ONLY this chapter's content. Focus your answer on this content, but you may infer connections to broader topics. IMPORTANT: All page number citations must be offset by ${chapterContext.pageOffset} to reflect the correct page in the original textbook.`
@@ -220,7 +260,7 @@ export const analyzeFiles = async (
 
     Instructions:
     1.  Analyze the conversation history for context.
-    2.  ${chapterInstruction}
+    2.  ${chapterInstruction}${focusedContext}
     3.  Formulate a detailed, tutor-quality answer using Markdown for formatting.
     4.  CRITICAL: For all mathematical equations, you MUST use KaTeX format. Wrap inline math with single dollar signs (e.g., \`$E=mc^2$\`) and block-level equations with double dollar signs (e.g., \`$$...$$\`).
     5.  Identify helpful images (diagrams, charts) from the PDFs and provide precise 'cropCoordinates' for each.
