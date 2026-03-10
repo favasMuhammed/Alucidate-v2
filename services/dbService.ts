@@ -180,6 +180,40 @@ export const dbService = {
         return updatedSubject;
     },
 
+    async updateChapterMetadata(
+        subjectId: string,
+        oldChapterId: string,
+        newChapterId: string,
+        newTitle: string,
+        currentSubject: SubjectData
+    ): Promise<SubjectData> {
+        // 1. Update the row in the chapters table
+        const { error: chapterError } = await supabase
+            .from('chapters')
+            .update({ chapter_id: newChapterId, chapter_title: newTitle })
+            .eq('subject_id', subjectId)
+            .eq('chapter_id', oldChapterId);
+
+        if (chapterError) throw new Error(`Failed to update chapter details: ${chapterError.message}`);
+
+        // 2. Update the mind map array node inside the Subject
+        const updatedSubject = { ...currentSubject };
+        if (updatedSubject.structure?.children) {
+            const nodeIndex = updatedSubject.structure.children.findIndex((ch: any) => ch.id === oldChapterId);
+            if (nodeIndex !== -1) {
+                updatedSubject.structure.children[nodeIndex] = {
+                    ...updatedSubject.structure.children[nodeIndex],
+                    id: newChapterId,
+                    title: newTitle,
+                };
+            }
+        }
+
+        // 3. Save the modified subject
+        await this.saveSubject(updatedSubject);
+        return updatedSubject;
+    },
+
     async getChapterDetails(id: string): Promise<ChapterDetails | undefined> {
         const { data, error } = await supabase
             .from('chapters')

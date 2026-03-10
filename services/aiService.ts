@@ -115,22 +115,22 @@ export const generateChapterDetails_Interactive = async (
     chapterNumber: number
 ): Promise<Omit<ChapterDetails, 'id' | 'subjectId' | 'chapterId'>> => {
     const model = "gemini-2.5-flash";
-    const systemInstruction = `You are an expert academic assistant. The user has provided a PDF containing a single chapter. Your task is to generate a comprehensive, interactive learning module for it.
+    const systemInstruction = `You are an expert academic assistant. The user has provided an educational document. This could be a single chapter OR a full textbook containing many chapters. Your task is to generate a comprehensive, interactive learning module for this specific document.
 
     Instructions:
-    1.  Identify the chapter's title from the most prominent heading on the first page.
-    2.  Provide a concise summary (3-5 sentences).
-    3.  Identify 5-10 essential keywords and provide a clear, 1-2 sentence definition for each.
-    4.  Generate a detailed, hierarchical mind map for THIS chapter.
-    5.  CRITICAL: The root node ID of the mind map MUST be "${chapterNumber}". All subsequent node IDs MUST be hierarchical, starting with the chapter number (e.g., "${chapterNumber}.1", "${chapterNumber}.1.1", etc.).
-    6.  The 'startPage' and 'endPage' for all nodes in the mind map should be relative to the provided chapter PDF (i.e., starting from page 1).
+    1.  Determine the primary overarching title of this specific document (e.g., "Kinematics Summary" or "Full Physics Textbook").
+    2.  Provide a concise summary (3-5 sentences) of the overall content.
+    3.  Identify 5-10 essential keywords across the document and provide a clear, 1-2 sentence definition for each.
+    4.  Generate a detailed, hierarchical mind map covering ALL chapters/sections present within this specific document.
+    5.  CRITICAL: The root node ID of the mind map MUST be "${chapterNumber}". All subsequent node IDs MUST be hierarchical, starting with this number (e.g., "${chapterNumber}.1", "${chapterNumber}.1.1", etc.).
+    6.  The 'startPage' and 'endPage' for all nodes in the mind map should be relative to the provided document PDF (i.e., starting from page 1).
     7.  Return a single JSON object matching the required schema.`;
 
     try {
         const response = await ai.models.generateContent({
             model: model,
             contents: [
-                { text: `Analyze the provided chapter PDF for Chapter ${chapterNumber}.` },
+                { text: `Analyze the provided educational document (Document ID/Order: ${chapterNumber}). Identify if it is a single chapter or a full textbook, and extract its structure.` },
                 { inlineData: { mimeType: 'application/pdf', data: chapterPdfFile.fileBase64 } }
             ],
             config: {

@@ -46,6 +46,11 @@ export const AdminView: React.FC = () => {
     const [editClassName, setEditClassName] = useState('');
     const [editClassType, setEditClassType] = useState<'class' | 'entrance'>('class');
 
+    // Phase 8: Document (Chapter) Editing
+    const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null);
+    const [editDocOrder, setEditDocOrder] = useState('');
+    const [editDocTitle, setEditDocTitle] = useState('');
+
 
     const activeSubject = subjects.find(s => s.id === activeSubjectId) || null;
 
@@ -227,6 +232,7 @@ export const AdminView: React.FC = () => {
                 setProcessProgress(75);
                 setProcessStep(4);
 
+                // Use the stringified auto-incremented number as the ID initially
                 const chapterDetails: ChapterDetails = { ...generatedDetails, id: crypto.randomUUID(), subjectId: currentSubject.id, chapterId: chapterNum.toString() };
                 const newChapterNode = { id: chapterDetails.chapterId, title: chapterDetails.chapterTitle, fileName: file.name, startPage: 1, endPage: pdf.numPages, children: [] };
 
@@ -291,6 +297,38 @@ export const AdminView: React.FC = () => {
         } catch (error: any) {
             console.error('Failed to delete chapter:', error);
             alert(`Failed to delete chapter: ${error.message || 'Unknown error'}`);
+        } finally {
+            setIsProcessing(false);
+            setProcessQueueText('');
+        }
+    };
+
+    const handleEditDocument = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeSubject || !editingDocumentId) return;
+        if (!editDocOrder.trim() || !editDocTitle.trim()) {
+            alert("Document ID/Order and Title are absolutely required.");
+            return;
+        }
+
+        setIsProcessing(true);
+        setProcessQueueText(`Updating Document Metadata...`);
+
+        try {
+            const updatedSubject = await dbService.updateChapterMetadata(
+                activeSubject.id,
+                editingDocumentId,
+                editDocOrder.trim(),
+                editDocTitle.trim(),
+                activeSubject
+            );
+
+            setSubjects(prev => prev.map(s => s.id === updatedSubject.id ? updatedSubject : s));
+            setEditingDocumentId(null);
+            await loadSubjects();
+        } catch (error: any) {
+            console.error('Failed to update document metadata:', error);
+            alert(`Failed to update document: ${error.message || 'Unknown error'}`);
         } finally {
             setIsProcessing(false);
             setProcessQueueText('');
@@ -437,6 +475,32 @@ export const AdminView: React.FC = () => {
                                     </motion.div>
                                 ) : activeTab === 'overview' ? (
                                     <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 max-w-3xl">
+
+                                        {/* Document Edit Modal Overlay */}
+                                        <AnimatePresence>
+                                            {editingDocumentId && (
+                                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-void/80 backdrop-blur-sm">
+                                                    <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-surface border border-border p-6 rounded-2xl w-full max-w-md shadow-2xl">
+                                                        <h3 className="text-xl font-bold text-ink mb-4">Edit Document Details</h3>
+                                                        <form onSubmit={handleEditDocument} className="space-y-4">
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-ink-3 uppercase mb-1">Document Order / ID</label>
+                                                                <input type="text" value={editDocOrder} onChange={e => setEditDocOrder(e.target.value)} className="w-full bg-void border border-border px-3 py-2 rounded-lg outline-none focus:border-brand text-ink" placeholder="e.g., 1, 2, Appendix A" required />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-ink-3 uppercase mb-1">Custom Title</label>
+                                                                <input type="text" value={editDocTitle} onChange={e => setEditDocTitle(e.target.value)} className="w-full bg-void border border-border px-3 py-2 rounded-lg outline-none focus:border-brand text-ink" required />
+                                                            </div>
+                                                            <div className="flex gap-3 pt-4">
+                                                                <button type="submit" className="flex-1 bg-brand text-void font-bold py-2 rounded-lg hover:bg-brand/90 transition-colors">Save Changes</button>
+                                                                <button type="button" onClick={() => setEditingDocumentId(null)} className="px-4 py-2 bg-raised text-ink-2 font-bold rounded-lg hover:text-ink transition-colors">Cancel</button>
+                                                            </div>
+                                                        </form>
+                                                    </motion.div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="bg-surface border border-border p-5 rounded-2xl">
                                                 <p className="text-ink-3 text-xs uppercase font-bold tracking-widest mb-1">Total Chapters</p>
@@ -469,16 +533,32 @@ export const AdminView: React.FC = () => {
                                                 {activeSubject.structure.children.map(ch => (
                                                     <div key={ch.id} className="relative group bg-surface/80 backdrop-blur-sm border border-border p-5 rounded-2xl flex flex-col hover:border-border-subtle hover:shadow-[var(--shadow-glow-purple)] transition-all duration-300">
                                                         <div className="flex items-start justify-between mb-2">
-                                                            <span className="text-[10px] font-bold uppercase tracking-widest text-brand bg-brand/10 px-2 py-0.5 rounded-md">Chapter {ch.id}</span>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDeleteChapter(activeSubject.id, ch.id, ch.title || ch.fileName); }}
-                                                                className="opacity-0 group-hover:opacity-100 p-1.5 text-ink-3 hover:text-danger hover:bg-danger/10 rounded-lg transition-all"
-                                                                title="Delete Chapter"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                                </svg>
-                                                            </button>
+                                                            <span className="text-[10px] font-bold uppercase tracking-widest text-brand bg-brand/10 px-2 py-0.5 rounded-md">Document {ch.id}</span>
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setEditingDocumentId(ch.id);
+                                                                        setEditDocOrder(ch.id);
+                                                                        setEditDocTitle(ch.title || ch.fileName);
+                                                                    }}
+                                                                    className="opacity-0 group-hover:opacity-100 p-1 text-ink-3 hover:text-brand hover:bg-brand/10 rounded transition-all"
+                                                                    title="Edit Document"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                                    </svg>
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteChapter(activeSubject.id, ch.id, ch.title || ch.fileName); }}
+                                                                    className="opacity-0 group-hover:opacity-100 p-1 text-ink-3 hover:text-danger hover:bg-danger/10 rounded transition-all"
+                                                                    title="Delete Document"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                         <h4 className="font-bold text-ink mb-1 truncate">{ch.title || ch.fileName}</h4>
                                                         <p className="text-xs text-ink-3 font-mono mt-auto pt-4 flex items-center gap-2">
