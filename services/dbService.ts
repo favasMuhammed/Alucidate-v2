@@ -60,10 +60,13 @@ export const dbService = {
     async getClasses(): Promise<Class[]> {
         const { data, error } = await supabase
             .from('classes')
-            .select('*')
-            .order('name', { ascending: true });
+            .select('*');
         if (error || !data) return [];
-        return data as Class[];
+
+        // Use natural sorting so 'Class 2' comes before 'Class 10'
+        return (data as Class[]).sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+        );
     },
 
     async saveClass(cls: Class): Promise<void> {
