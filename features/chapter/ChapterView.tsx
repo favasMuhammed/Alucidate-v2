@@ -172,7 +172,7 @@ export const ChapterView: React.FC = () => {
         <div className="h-[calc(100vh-56px)] w-full flex flex-col lg:flex-row overflow-hidden bg-void font-sans">
             {/* ── Left Panel ────────────────────────────────────────────── */}
             <motion.div
-                layout
+                layout="position"
                 transition={{ type: 'spring', stiffness: 200, damping: 30 }}
                 className={`w-full ${layout === 'left' ? 'lg:w-full' : layout === 'right' ? 'hidden lg:hidden' : 'lg:w-3/5'} ${mobileView === 'chat' ? 'hidden lg:flex' : 'flex'} h-full flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-surface shrink-0 lg:shrink transition-width duration-300 ease-in-out`}
             >
@@ -259,7 +259,7 @@ export const ChapterView: React.FC = () => {
             <AnimatePresence>
                 {(layout !== 'left' || isMobile) && (
                     <motion.div
-                        layout
+                        layout="position"
                         initial={isMobile ? { opacity: 0 } : { opacity: 0, width: 0 }}
                         animate={{ opacity: 1, width: isMobile ? '100%' : (layout === 'right' ? '100%' : '40%') }}
                         exit={isMobile ? { opacity: 0 } : { opacity: 0, width: 0 }}
