@@ -78,8 +78,8 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
     const layoutNodes = useMemo(() => {
         const nodes: SVGNode[] = [];
         const levelCounts: Record<number, number> = {};
-        const levelSpacing = 260; // X distance
-        const verticalSpacing = 90; // Y distance
+        const levelSpacing = 280; // Slightly increased from 260 for better breathing room
+        const verticalSpacing = 100; // Increased from 90 for FAANG-level clarity
 
         // Count ONLY expanded nodes per level to center them accurately
         const countNodes = (node: MindMapNodeType, level: number) => {
@@ -208,6 +208,7 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
                                 exit={{ opacity: 0, scale: 0.5, x: (node.parent?.x || node.x) - w / 2, y: (node.parent?.y || node.y) - h / 2 }}
                                 transition={{ type: 'spring', stiffness: 350, damping: 28, mass: 0.8 }}
                                 onClick={(e) => { e.stopPropagation(); onNodeSelect(node); }}
+                                onPointerDown={(e) => e.stopPropagation()}
                                 className={`absolute flex items-center p-4 cursor-pointer transition-all shadow-md group ${isRoot
                                     ? 'bg-[url(#rootGrad)] text-white rounded-3xl border border-white/10 shadow-brand/20 z-30'
                                     : node.level === 1
@@ -227,6 +228,7 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
                                 {hasChildren && (
                                     <button
                                         onClick={(e) => toggleExpand(node.id, e)}
+                                        onPointerDown={(e) => e.stopPropagation()}
                                         className={`absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center border font-bold text-xs transition-all ${isExpanded
                                             ? 'bg-surface border-border text-ink-2 hover:text-brand'
                                             : 'bg-brand text-white border-brand shadow-md glow-brand hover:bg-white hover:text-brand'
@@ -242,12 +244,12 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
             </motion.div>
 
             {/* Floating Navigation Controls */}
-            <div className="absolute bottom-8 right-8 flex items-center gap-1.5 bg-surface/80 backdrop-blur-md border border-border/50 p-1.5 rounded-xl shadow-2xl">
-                <button onClick={() => setScale(s => Math.max(0.3, s - 0.2))} className="w-10 h-10 rounded-lg hover:bg-white/5 text-ink-2 flex items-center justify-center text-lg transition-colors">−</button>
-                <div className="w-px h-5 bg-border mx-1" />
-                <button onClick={() => { setScale(1); setPan({ x: 100, y: dimensions.h / 2 - 400 }); }} className="px-4 h-10 tracking-widest text-[10px] uppercase font-bold text-ink hover:text-brand transition-colors rounded-lg hover:bg-white/5">Re-Center</button>
-                <div className="w-px h-5 bg-border mx-1" />
-                <button onClick={() => setScale(s => Math.min(2.5, s + 0.2))} className="w-10 h-10 rounded-lg hover:bg-white/5 text-ink-2 flex items-center justify-center text-lg transition-colors">+</button>
+            <div className="absolute bottom-6 right-6 sm:bottom-8 sm:right-8 flex items-center gap-1 bg-surface/80 backdrop-blur-md border border-border/50 p-1 rounded-xl shadow-2xl z-40">
+                <button onClick={() => setScale(s => Math.max(0.3, s - 0.2))} className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg hover:bg-white/5 text-ink-2 flex items-center justify-center text-lg transition-colors">−</button>
+                <div className="w-px h-4 bg-border mx-0.5" />
+                <button onClick={() => { setScale(1); setPan({ x: 100, y: dimensions.h / 2 - 400 }); }} className="px-3 sm:px-4 h-9 sm:h-10 tracking-widest text-[9px] sm:text-[10px] uppercase font-bold text-ink hover:text-brand transition-colors rounded-lg hover:bg-white/5">Re-Center</button>
+                <div className="w-px h-4 bg-border mx-0.5" />
+                <button onClick={() => setScale(s => Math.min(2.5, s + 0.2))} className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg hover:bg-white/5 text-ink-2 flex items-center justify-center text-lg transition-colors">+</button>
             </div>
         </div>
     );

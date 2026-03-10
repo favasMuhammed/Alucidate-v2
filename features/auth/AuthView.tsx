@@ -33,6 +33,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
     // OTP fields
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [expectedOtp, setExpectedOtp] = useState('');
+    const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
     // UI State
     const [loading, setLoading] = useState(false);
@@ -191,7 +192,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
         setOtp(newOtp);
 
         if (val && index < 5) {
-            document.getElementById(`otp-${index + 1}`)?.focus();
+            otpRefs.current[index + 1]?.focus();
         }
 
         if (newOtp.every(d => d !== '')) {
@@ -201,7 +202,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
 
     const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
         if (e.key === 'Backspace' && !otp[index] && index > 0) {
-            document.getElementById(`otp-${index - 1}`)?.focus();
+            otpRefs.current[index - 1]?.focus();
         }
     };
 
@@ -440,7 +441,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                                     {otp.map((d, i) => (
                                         <input
                                             key={i}
-                                            id={`otp-${i}`}
+                                            ref={el => otpRefs.current[i] = el}
                                             type="text"
                                             maxLength={1}
                                             value={d}
@@ -481,15 +482,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                 </div>
             </div>
 
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                @keyframes shake {
-                    0%, 100% { transform: translateX(0); }
-                    25% { transform: translateX(-4px); }
-                    75% { transform: translateX(4px); }
-                }
-                .animate-shake { animation: shake 0.2s ease-in-out 0s 2; }
-            `}} />
         </div>
     );
 };

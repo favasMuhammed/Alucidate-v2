@@ -9,6 +9,22 @@ import { hashStringToHue } from '@/utils';
 
 // ── Helpers ────────────────────────────────────────────────────────
 
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.08,
+            delayChildren: 0.1
+        }
+    }
+};
+
+const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as any } }
+};
+
 function getGreeting() {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -143,7 +159,12 @@ export const DashboardView: React.FC = () => {
                     )}
                 </motion.div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <motion.div
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                >
                     <AnimatePresence>
                         {subjects.map((s, i) => {
                             const hue = hashStringToHue(s.subject);
@@ -165,9 +186,7 @@ export const DashboardView: React.FC = () => {
                                 <motion.button
                                     key={s.id}
                                     layoutId={`subject-card-${s.id}`}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.06, ease: 'easeOut' }}
+                                    variants={cardVariants}
                                     whileHover={{ y: -4, transition: { duration: 0.2 } }}
                                     onClick={() => navigate(`/subject/${s.id}`)}
                                     className="group text-left relative flex flex-col bg-surface border border-border rounded-2xl overflow-hidden shadow-sm hover:border-border-subtle hover:shadow-[var(--shadow-glow-brand)] transition-all duration-300"
@@ -210,7 +229,7 @@ export const DashboardView: React.FC = () => {
                             );
                         })}
                     </AnimatePresence>
-                </div>
+                </motion.div>
             )}
         </div>
     );
