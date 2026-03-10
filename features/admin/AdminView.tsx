@@ -40,6 +40,10 @@ export const AdminView: React.FC = () => {
     const [newClassName, setNewClassName] = useState('');
     const [newClassType, setNewClassType] = useState<'class' | 'entrance'>('class');
     const [subjectClassSelection, setSubjectClassSelection] = useState('');
+    const [classError, setClassError] = useState('');
+    const [editingClassId, setEditingClassId] = useState<string | null>(null);
+    const [editClassName, setEditClassName] = useState('');
+    const [editClassType, setEditClassType] = useState<'class' | 'entrance'>('class');
 
 
     const activeSubject = subjects.find(s => s.id === activeSubjectId) || null;
@@ -107,7 +111,7 @@ export const AdminView: React.FC = () => {
         const trimmedName = newClassName.trim();
         if (!trimmedName) return;
         if (classes.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
-            alert('A class with this name already exists.');
+            setClassError('A class with this name already exists.');
             return;
         }
         try {
@@ -117,19 +121,58 @@ export const AdminView: React.FC = () => {
                 type: newClassType
             });
             setNewClassName('');
+            setClassError('');
             loadClasses();
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
+            setClassError(err.message || 'Failed to create class.');
         }
     };
 
     const quickAddClass = async (name: string, type: 'class' | 'entrance') => {
-        if (classes.some(c => c.name.toLowerCase() === name.toLowerCase())) return;
+        if (classes.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+            setClassError(`${name} already exists.`);
+            return;
+        }
         try {
             await dbService.saveClass({ id: crypto.randomUUID(), name, type });
+            setClassError('');
             loadClasses();
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
+            setClassError(err.message || `Failed to add ${name}.`);
+        }
+    };
+
+    const handleStartEditClass = (c: Class) => {
+        setEditingClassId(c.id);
+        setEditClassName(c.name);
+        setEditClassType(c.type);
+        setClassError('');
+    };
+
+    const handleUpdateClass = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const trimmedName = editClassName.trim();
+        if (!trimmedName || !editingClassId) return;
+
+        if (classes.some(c => c.id !== editingClassId && c.name.toLowerCase() === trimmedName.toLowerCase())) {
+            setClassError('A class with this name already exists.');
+            return;
+        }
+
+        try {
+            await dbService.saveClass({
+                id: editingClassId,
+                name: trimmedName,
+                type: editClassType
+            });
+            setEditingClassId(null);
+            setClassError('');
+            loadClasses();
+        } catch (err: any) {
+            console.error(err);
+            setClassError(err.message || 'Failed to update class.');
         }
     };
 
@@ -230,14 +273,16 @@ export const AdminView: React.FC = () => {
         <div className="h-[calc(100vh-56px)] mt-14 flex w-full max-w-[1280px] mx-auto bg-void text-ink font-sans">
             {/* ── Sidebar ── */}
             <aside className="w-[280px] border-r border-border flex flex-col pt-6 pb-4 shrink-0">
-                <div className="px-6 mb-4 flex items-center justify-between">
+                <div className="px-6 mb-4 flex flex-col gap-3">
                     <h2 className="text-xs font-bold uppercase tracking-widest text-ink-3">Course Manager</h2>
                     <div className="flex gap-2">
-                        <button onClick={() => setIsManagingClasses(true)} title="Manage Classes" className="text-ink-3 hover:text-brand transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        <button onClick={() => setIsManagingClasses(true)} className="flex-1 px-3 py-1.5 flex items-center justify-center gap-2 bg-raised border border-border rounded-lg text-xs font-bold text-ink-2 hover:text-ink hover:border-brand transition-all">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                            Classes
                         </button>
-                        <button onClick={() => { setIsCreating(true); setTimeout(() => inputRef.current?.focus(), 100); }} title="Add Subject" className="text-brand hover:text-brand-dim transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                        <button onClick={() => { setIsCreating(true); setTimeout(() => inputRef.current?.focus(), 100); }} className="flex-1 px-3 py-1.5 flex items-center justify-center gap-2 bg-brand text-white rounded-lg text-xs font-bold hover:bg-brand-dim transition-all">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                            Subject
                         </button>
                     </div>
                 </div>
@@ -390,40 +435,67 @@ export const AdminView: React.FC = () => {
                                 <button onClick={() => setIsManagingClasses(false)} className="text-sm font-bold text-brand h-10 px-4 rounded-xl hover:bg-brand/10">CLOSE</button>
                             </div>
 
-                            <form onSubmit={handleCreateClass} className="bg-surface border border-border p-6 rounded-2xl mb-8 flex gap-4 items-end">
-                                <div className="flex-1 space-y-2">
-                                    <label className="text-xs font-bold text-ink-3 uppercase">Class Name</label>
-                                    <input type="text" value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="e.g. Class 12, NEET..." className="w-full bg-void border border-border px-4 py-2.5 rounded-xl outline-none focus:border-brand" />
+                            {classError && (
+                                <div className="mb-4 p-3 bg-danger/10 border border-danger/20 text-danger text-sm rounded-xl">
+                                    {classError}
                                 </div>
-                                <div className="w-48 space-y-2">
-                                    <label className="text-xs font-bold text-ink-3 uppercase">Type</label>
-                                    <select value={newClassType} onChange={e => setNewClassType(e.target.value as any)} className="w-full bg-void border border-border px-4 py-2.5 rounded-xl outline-none focus:border-brand">
-                                        <option value="class">Regular Class</option>
-                                        <option value="entrance">Entrance Exam</option>
-                                    </select>
-                                </div>
-                                <button type="submit" className="h-11 bg-brand text-void px-8 rounded-xl font-bold hover:bg-brand-dim transition-all">ADD CLASS</button>
-                            </form>
+                            )}
 
-                            <div className="mb-8 p-6 bg-surface border border-border rounded-2xl">
-                                <h2 className="text-xs font-bold text-ink-3 uppercase mb-3">Quick Add: Regular Classes</h2>
-                                <div className="flex flex-wrap gap-2 mb-6">
-                                    {['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'].map(c => (
-                                        <button key={c} onClick={() => quickAddClass(c, 'class')} disabled={classes.some(existing => existing.name === c)} className="px-3 py-1.5 text-xs font-bold bg-void border border-border rounded-lg hover:border-brand hover:text-brand disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-ink-2">
-                                            {c}
-                                        </button>
-                                    ))}
-                                </div>
-                                <h2 className="text-xs font-bold text-ink-3 uppercase mb-3">Quick Add: Entrance Exams</h2>
-                                <div className="flex flex-wrap gap-2">
-                                    {['NEET', 'JEE Main', 'JEE Advanced', 'CUET', 'NDA'].map(c => (
-                                        <button key={c} onClick={() => quickAddClass(c, 'entrance')} disabled={classes.some(existing => existing.name === c)} className="px-3 py-1.5 text-xs font-bold bg-void border border-border rounded-lg hover:border-purple hover:text-purple disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-ink-2">
-                                            {c}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                            {editingClassId ? (
+                                <form onSubmit={handleUpdateClass} className="bg-brand/10 border border-brand/30 p-6 rounded-2xl mb-8 flex gap-4 items-end">
+                                    <div className="flex-1 space-y-2">
+                                        <label className="text-xs font-bold text-brand uppercase">Edit Class Name</label>
+                                        <input type="text" value={editClassName} onChange={e => setEditClassName(e.target.value)} className="w-full bg-void border border-border px-4 py-2.5 rounded-xl outline-none focus:border-brand" />
+                                    </div>
+                                    <div className="w-48 space-y-2">
+                                        <label className="text-xs font-bold text-brand uppercase">Type</label>
+                                        <select value={editClassType} onChange={e => setEditClassType(e.target.value as any)} className="w-full bg-void border border-border px-4 py-2.5 rounded-xl outline-none focus:border-brand">
+                                            <option value="class">Regular Class</option>
+                                            <option value="entrance">Entrance Exam</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button type="submit" className="h-11 bg-brand text-void px-6 rounded-xl font-bold hover:bg-brand-dim transition-all">SAVE</button>
+                                        <button type="button" onClick={() => setEditingClassId(null)} className="h-11 border border-border text-ink-2 px-6 rounded-xl font-bold hover:bg-raised transition-all">CANCEL</button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <form onSubmit={handleCreateClass} className="bg-surface border border-border p-6 rounded-2xl mb-8 flex gap-4 items-end">
+                                    <div className="flex-1 space-y-2">
+                                        <label className="text-xs font-bold text-ink-3 uppercase">Class Name</label>
+                                        <input type="text" value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="e.g. Class 12, NEET..." className="w-full bg-void border border-border px-4 py-2.5 rounded-xl outline-none focus:border-brand" />
+                                    </div>
+                                    <div className="w-48 space-y-2">
+                                        <label className="text-xs font-bold text-ink-3 uppercase">Type</label>
+                                        <select value={newClassType} onChange={e => setNewClassType(e.target.value as any)} className="w-full bg-void border border-border px-4 py-2.5 rounded-xl outline-none focus:border-brand">
+                                            <option value="class">Regular Class</option>
+                                            <option value="entrance">Entrance Exam</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" className="h-11 bg-brand text-void px-8 rounded-xl font-bold hover:bg-brand-dim transition-all">ADD CLASS</button>
+                                </form>
+                            )}
 
+                            {!editingClassId && (
+                                <div className="mb-8 p-6 bg-surface border border-border rounded-2xl">
+                                    <h2 className="text-xs font-bold text-ink-3 uppercase mb-3">Quick Add: Regular Classes</h2>
+                                    <div className="flex flex-wrap gap-2 mb-6">
+                                        {['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'].map(c => (
+                                            <button key={c} onClick={() => quickAddClass(c, 'class')} disabled={classes.some(existing => existing.name === c)} className="px-3 py-1.5 text-xs font-bold bg-void border border-border rounded-lg hover:border-brand hover:text-brand disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-ink-2">
+                                                {c}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <h2 className="text-xs font-bold text-ink-3 uppercase mb-3">Quick Add: Entrance Exams</h2>
+                                    <div className="flex flex-wrap gap-2">
+                                        {['NEET', 'JEE Main', 'JEE Advanced', 'CUET', 'NDA'].map(c => (
+                                            <button key={c} onClick={() => quickAddClass(c, 'entrance')} disabled={classes.some(existing => existing.name === c)} className="px-3 py-1.5 text-xs font-bold bg-void border border-border rounded-lg hover:border-purple hover:text-purple disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-ink-2">
+                                                {c}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {classes.map(c => (
@@ -432,9 +504,14 @@ export const AdminView: React.FC = () => {
                                             <h3 className="font-bold text-ink">{c.name}</h3>
                                             <span className="text-[10px] font-bold uppercase tracking-widest text-brand">{c.type}</span>
                                         </div>
-                                        <button onClick={() => handleDeleteClass(c.id)} className="opacity-0 group-hover:opacity-100 p-2 text-ink-3 hover:text-danger hover:bg-danger/10 rounded-lg transition-all">
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        </button>
+                                        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => handleStartEditClass(c)} className="p-2 text-ink-3 hover:text-brand hover:bg-brand/10 rounded-lg transition-all" title="Edit Class">
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                            </button>
+                                            <button onClick={() => handleDeleteClass(c.id)} className="p-2 text-ink-3 hover:text-danger hover:bg-danger/10 rounded-lg transition-all" title="Delete Class">
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
