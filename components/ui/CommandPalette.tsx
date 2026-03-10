@@ -1,13 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { Search, Folder, Zap, Settings, ArrowRight, CornerDownLeft } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 
 const mockResults = [
-    { id: '1', title: 'Calculus 101', type: 'Subject', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
-    { id: '2', title: 'Chapter 3: Derivatives', type: 'Chapter', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-    { id: '3', title: 'Upload new material', type: 'Action', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' },
-    { id: '4', title: 'Settings', type: 'System', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' }
+    { id: '1', title: 'Calculus 101', type: 'Subject', icon: Folder, section: 'Recent Subjects' },
+    { id: '2', title: 'Chapter 3: Derivatives', type: 'Chapter', icon: Folder, section: 'Recent Subjects' },
+    { id: '3', title: 'Generate Practice Quiz', type: 'Action', icon: Zap, section: 'Actions' },
+    { id: '4', title: 'Upload New Material', type: 'Action', icon: Zap, section: 'Actions' },
+    { id: '5', title: 'Settings', type: 'System', icon: Settings, section: 'General' },
+    { id: '6', title: 'Dashboard', type: 'Navigation', icon: ArrowRight, section: 'General' }
 ];
 
 export const CommandPalette: React.FC = () => {
@@ -50,33 +53,40 @@ export const CommandPalette: React.FC = () => {
 
     const handleExecute = (id: string, type: string) => {
         setCommandPaletteOpen(false);
-        if (type === 'Action') navigate('/admin');
+        if (type === 'Action') navigate('/dashboard');
         else if (type === 'Subject') navigate('/dashboard');
-        else if (type === 'System') navigate('/dashboard'); // placeholder
+        else if (type === 'Navigation') navigate('/dashboard');
+        else navigate('/dashboard'); // default
     };
+
+    // Grouping
+    const sections = Array.from(new Set(filtered.map(r => r.section)));
 
     return (
         <AnimatePresence>
             {isCommandPaletteOpen && (
-                <>
+                <div className="fixed inset-0 z-[110] font-sans flex items-start justify-center pt-[15vh] px-4">
+                    {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-void/80 backdrop-blur-md z-[100]"
+                        transition={{ duration: 0.2 }}
+                        className="absolute inset-0 bg-void/80 backdrop-blur-md"
                         onClick={() => setCommandPaletteOpen(false)}
                     />
+
+                    {/* Palette */}
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.98, y: -20 }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 400 }}
-                        className="fixed top-[15vh] left-[50%] -translate-x-[50%] w-full max-w-2xl bg-surface border border-border shadow-[0_0_80px_rgba(59,130,246,0.1)] rounded-2xl overflow-hidden z-[101] flex flex-col"
+                        initial={{ opacity: 0, scale: 0.96, y: -20, filter: 'blur(8px)' }}
+                        animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+                        exit={{ opacity: 0, scale: 0.98, y: -10, filter: 'blur(4px)' }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                        className="relative w-full max-w-2xl bg-surface/90 backdrop-blur-xl border border-border shadow-[0_32px_80px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-[20px] overflow-hidden flex flex-col"
                     >
-                        <div className="flex items-center px-4 border-b border-border/50">
-                            <svg className="w-5 h-5 text-ink-3 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
+                        {/* Input Area */}
+                        <div className="flex items-center px-5 py-2 border-b border-border/60 bg-surface/50">
+                            <Search className="w-5 h-5 text-ink-3 mr-3" />
                             <input
                                 ref={inputRef}
                                 value={query}
@@ -93,41 +103,70 @@ export const CommandPalette: React.FC = () => {
                                         handleExecute(filtered[activeIndex].id, filtered[activeIndex].type);
                                     }
                                 }}
-                                className="flex-1 bg-transparent border-none outline-none py-5 text-lg text-ink placeholder-ink-3 font-sans"
-                                placeholder="Search Alucidate or type a command..."
+                                className="flex-1 bg-transparent border-none outline-none py-4 font-[Geist] text-[18px] text-ink placeholder-ink-3 tracking-tight"
+                                placeholder="What do you need?"
                             />
-                            <div className="flex items-center gap-1">
-                                <kbd className="hidden sm:inline-block px-2 border border-border rounded-md text-xs font-sans text-ink-3 bg-raised">ESC</kbd>
-                            </div>
+                            <kbd className="hidden sm:flex items-center justify-center h-6 px-2 border border-border/80 rounded-[var(--r-sm)] text-[10px] font-mono font-bold text-ink-3 uppercase bg-raised hover:text-ink transition-colors cursor-pointer shadow-sm">
+                                ESC
+                            </kbd>
                         </div>
 
-                        <div className="max-h-[60vh] overflow-y-auto p-2 custom-scrollbar">
+                        {/* Results list */}
+                        <div className="max-h-[50vh] overflow-y-auto p-3 scroll-smooth">
                             {filtered.length === 0 ? (
-                                <div className="p-8 text-center text-ink-3 text-sm">No results found for "{query}"</div>
+                                <div className="py-12 text-center flex flex-col items-center gap-3">
+                                    <div className="w-12 h-12 rounded-full bg-raised flex items-center justify-center text-ink-3">
+                                        <Search className="w-5 h-5" />
+                                    </div>
+                                    <p className="font-[Geist] text-[14px] text-ink-3">No results found for "{query}"</p>
+                                </div>
                             ) : (
-                                filtered.map((item, index) => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => handleExecute(item.id, item.type)}
-                                        onMouseEnter={() => setActiveIndex(index)}
-                                        className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${activeIndex === index ? 'bg-brand text-white' : 'hover:bg-raised text-ink'
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <svg className={`w-5 h-5 ${activeIndex === index ? 'text-white' : 'text-ink-3'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-                                            </svg>
-                                            <span className="font-medium text-sm">{item.title}</span>
-                                        </div>
-                                        <span className={`text-xs uppercase tracking-wider font-bold ${activeIndex === index ? 'text-white/70' : 'text-ink-3'}`}>
-                                            {item.type}
-                                        </span>
-                                    </button>
-                                ))
+                                <div className="flex flex-col gap-4">
+                                    {sections.map(section => {
+                                        const sectionItems = filtered.filter(f => f.section === section);
+                                        return (
+                                            <div key={section} className="flex flex-col gap-1">
+                                                <div className="px-3 pb-2 pt-1 font-mono text-[10px] tracking-[0.1em] font-bold text-ink-4 uppercase">
+                                                    {section}
+                                                </div>
+                                                {sectionItems.map(item => {
+                                                    const globalIndex = filtered.findIndex(f => f.id === item.id);
+                                                    const isActive = activeIndex === globalIndex;
+                                                    const Icon = item.icon;
+                                                    return (
+                                                        <button
+                                                            key={item.id}
+                                                            onClick={() => handleExecute(item.id, item.type)}
+                                                            onMouseEnter={() => setActiveIndex(globalIndex)}
+                                                            className={`w-full flex items-center justify-between p-3 rounded-[var(--r-md)] transition-all duration-75 group text-left ${isActive
+                                                                    ? 'bg-brand text-white shadow-[0_2px_8px_rgba(59,130,246,0.3)]'
+                                                                    : 'bg-transparent text-ink hover:bg-raised-2'
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`flex items-center justify-center w-8 h-8 rounded-[var(--r-sm)] transition-colors ${isActive ? 'bg-white/10' : 'bg-raised group-hover:bg-surface border border-border/50'}`}>
+                                                                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-ink-2 group-hover:text-ink'}`} />
+                                                                </div>
+                                                                <span className={`font-[Geist] font-medium text-[14px] leading-tight ${isActive ? 'text-white' : 'text-ink'}`}>
+                                                                    {item.title}
+                                                                </span>
+                                                            </div>
+                                                            {isActive && (
+                                                                <span className="text-white/60 flex items-center">
+                                                                    <CornerDownLeft className="w-3.5 h-3.5" />
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             )}
                         </div>
                     </motion.div>
-                </>
+                </div>
             )}
         </AnimatePresence>
     );

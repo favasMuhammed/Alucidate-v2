@@ -1,49 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ChevronLeft, LayoutGrid, PanelRight, Map as MapIcon, FileText, Hash, MessageSquare } from 'lucide-react';
 import { SubjectData, ChapterDetails, MindMapNode as NodeType, ConversationTurn } from '@/types';
 import { dbService } from '@/services/dbService';
 import { analyzeFiles } from '@/services/aiService';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+
+// Extracted Components
 import { MindMap } from '@/components/mindmap/MindMap';
-import ReactMarkdown from 'react-markdown';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css';
+import { SummaryView } from '@/components/chapter/SummaryView';
+import { KeywordsView } from '@/components/chapter/KeywordsView';
+import { TutorPanel } from '@/components/chat/TutorPanel';
 import { useAuth } from '@/hooks/useAuth';
 
-interface ChatMessage {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    parsed?: { answer: string; citations?: any[]; images?: any[]; };
-    status: 'sending' | 'typing' | 'done' | 'error';
-    timestamp: number;
-}
-
-// ── AI Typewriter Response Renderer ──────────────────────────────────────────
-const TypewriterResponse: React.FC<{ html: string }> = ({ html }) => (
-    <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-raised"
-    >
-        <ReactMarkdown
-            remarkPlugins={[remarkMath]}
-            rehypePlugins={[rehypeKatex]}
-            components={{
-                p: ({ ...props }) => <p className="mb-4 font-[Instrument_Serif] text-lg leading-relaxed" {...props} />,
-                h3: ({ ...props }) => <h3 className="font-sans font-bold text-xl mt-6 mb-3 text-ink" {...props} />,
-                strong: ({ ...props }) => <strong className="font-bold text-ink" {...props} />,
-            }}
-        >
-            {html}
-        </ReactMarkdown>
-    </motion.div>
-);
-
-// ── Main View ────────────────────────────────────────────────────────────────
 export const ChapterView: React.FC = () => {
     const { subjectId, chapterId } = useParams<{ subjectId: string; chapterId: string }>();
     const { user } = useAuth();
@@ -53,23 +23,24 @@ export const ChapterView: React.FC = () => {
     const [chapter, setChapter] = useState<ChapterDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
-    const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-    const [input, setInput] = useState('');
+    const [chatHistory, setChatHistory] = useState<any[]>([]);
+
+    // UI State
     const [activeTab, setActiveTab] = useState<'mindmap' | 'summary' | 'keywords'>('mindmap');
     const [selectedNode, setSelectedNode] = useState<NodeType | null>(null);
-    const [layout, setLayout] = useState<'split' | 'left' | 'right'>('split');
-    const [mobileView, setMobileView] = useState<'content' | 'chat'>('content');
+    const [chatOpen, setChatOpen] = useState(true);
+    const [leftPanelWidth, setLeftPanelWidth] = useState(58); // %
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
-    const chatEndRef = useRef<HTMLDivElement>(null);
+    const [mobileTab, setMobileTab] = useState<'mindmap' | 'summary' | 'keywords' | 'chat'>('mindmap');
 
-    // Track window resize for layout switches
+    const isDragging = useRef(false);
+
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 1024);
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Load subject, chapter, and conversation history
     useEffect(() => {
         if (!subjectId || !chapterId || !user) return;
         let mounted = true;
@@ -86,8 +57,7 @@ export const ChapterView: React.FC = () => {
                 if (!chap) { setLoadError('Chapter not found.'); return; }
                 setSubject(subj);
                 setChapter(chap);
-                setChatHistory(history as ChatMessage[]);
-                // Track last visited
+                setChatHistory(history || []);
                 localStorage.setItem(`last_studied_${subjectId}`, new Date().toISOString());
             } catch (err: any) {
                 if (mounted) setLoadError(err.message || 'Failed to load chapter.');
@@ -97,34 +67,46 @@ export const ChapterView: React.FC = () => {
         };
         init();
         return () => { mounted = false; };
-    }, [subjectId, chapterId, user?.email]);
+    }, [subjectId, chapterId, user]);
 
-    // Auto-scroll to latest chat message
-    useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [chatHistory]);
-
-    const handleNodeSelect = (node: NodeType) => {
-        setSelectedNode(node);
-        if (!input) setInput(`Explain "${node.title}" in the context of this chapter.`);
-        // On mobile, automatically show chat when a node is selected to see the answer
-        if (isMobile) setMobileView('chat');
+    // Resizing Logic
+    const handleMouseMove = (e: MouseEvent) => {
+        if (!isDragging.current) return;
+        requestAnimationFrame(() => {
+            const newWidth = (e.clientX / window.innerWidth) * 100;
+            if (newWidth >= 30 && newWidth <= 70) {
+                setLeftPanelWidth(newWidth);
+            }
+        });
     };
 
-    const handleSend = async (text: string = input) => {
+    const handleMouseUp = () => {
+        isDragging.current = false;
+        document.body.style.cursor = '';
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        isDragging.current = true;
+        document.body.style.cursor = 'col-resize';
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+    };
+
+    const handleSendMsg = async (text: string) => {
         if (!text.trim() || !user || !subject || !chapter) return;
         const msgId = Date.now().toString();
-        const userMsg: ChatMessage = { id: `${msgId}_u`, role: 'user', content: text, status: 'done', timestamp: Date.now() };
-        setInput('');
-        setChatHistory(prev => [...prev, userMsg, { id: `${msgId}_a`, role: 'assistant', content: '', status: 'typing', timestamp: Date.now() + 1 }]);
+        const userMsg = { id: `${msgId}_u`, role: 'user', content: text, status: 'done', timestamp: Date.now() };
 
-        // Track progress
+        setChatHistory(prev => [...prev, userMsg, { id: `${msgId}_a`, role: 'assistant', content: '', status: 'sending', timestamp: Date.now() + 1 }]);
+
         const qsCount = parseInt(localStorage.getItem(`qs_${chapterId}`) || '0', 10) + 1;
         localStorage.setItem(`qs_${chapterId}`, qsCount.toString());
 
         try {
-            // Get PDF context from IndexedDB cache
-            const relevantFiles: { fileName: string; fileBase64: string; totalPages: number }[] = [];
+            const relevantFiles: any[] = [];
             const chapterNode = subject.structure?.children?.find(c => c.id === chapterId);
             if (chapterNode?.fileName) {
                 const cachedPdf = await dbService.getPdfFromCache(chapterNode.fileName);
@@ -151,225 +133,180 @@ export const ChapterView: React.FC = () => {
                 }
             );
 
-            const newHistory = [...chatHistory, userMsg, { id: `${msgId}_a`, role: 'assistant' as const, content: parsedRes.answer, parsed: parsedRes, status: 'done' as const, timestamp: Date.now() + 1 }];
+            const newHistory = [...chatHistory, userMsg, { id: `${msgId}_a`, role: 'assistant', content: parsedRes.answer, parsed: parsedRes, status: 'done', timestamp: Date.now() + 1 }];
             setChatHistory(newHistory);
             await dbService.saveConversationHistory(user.email, subjectId!, chapterId!, newHistory);
-
         } catch (err: any) {
             setChatHistory(prev => prev.map(m => m.id === `${msgId}_a` ? { ...m, content: err.message || 'Failed to generate response.', status: 'error' } : m));
         }
     };
 
-    if (loading) return <LoadingSpinner fullScreen label="Preparing ALUCIDATE Tutor Engine..." />;
+    if (loading) return <LoadingSpinner fullScreen label="Preparing ALUCIDATE..." />;
     if (loadError || !subject || !chapter) return (
         <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
             <p className="text-danger">{loadError || 'Chapter not found.'}</p>
-            <button onClick={() => navigate(subjectId ? `/subject/${subjectId}` : '/dashboard')} className="text-brand underline text-sm">← Go back</button>
+            <button onClick={() => navigate('/dashboard')} className="text-brand underline text-sm">← Back</button>
         </div>
     );
 
+    // Mobile specific layout render mapping
+    const MappedContent = () => {
+        if (isMobile) {
+            if (mobileTab === 'chat') {
+                return (
+                    <div className="h-full w-full pb-[56px] relative overflow-hidden bg-void">
+                        <TutorPanel
+                            chatHistory={chatHistory}
+                            onSend={handleSendMsg}
+                            onExpandToggle={() => { }}
+                            isExpanded={true}
+                            selectedNode={selectedNode}
+                            onClearNode={() => setSelectedNode(null)}
+                            subjectName={subject.subject}
+                            chapterName={chapter.chapterTitle}
+                        />
+                    </div>
+                );
+            }
+            if (mobileTab === 'mindmap') return <MindMap data={chapter.mindMap!} onNodeSelect={setSelectedNode} activeNodeId={selectedNode?.id || null} />;
+            if (mobileTab === 'summary') return <SummaryView summary={chapter.summary} />;
+            if (mobileTab === 'keywords') return <KeywordsView keywords={chapter.keywords} />;
+        }
+
+        return (
+            <AnimatePresence mode="wait">
+                <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="absolute inset-0">
+                    {activeTab === 'mindmap' && <MindMap data={chapter.mindMap!} onNodeSelect={setSelectedNode} activeNodeId={selectedNode?.id || null} />}
+                    {activeTab === 'summary' && <SummaryView summary={chapter.summary} />}
+                    {activeTab === 'keywords' && <KeywordsView keywords={chapter.keywords} />}
+                </motion.div>
+            </AnimatePresence>
+        );
+    };
+
     return (
-        <div className="h-[calc(100vh-56px)] w-full flex flex-col lg:flex-row overflow-hidden bg-void font-sans">
-            {/* ── Left Panel ────────────────────────────────────────────── */}
-            <motion.div
-                transition={{ type: 'spring', stiffness: 200, damping: 30 }}
-                className={`w-full ${layout === 'left' ? 'lg:w-full' : layout === 'right' ? 'hidden lg:hidden' : 'lg:w-3/5'} ${mobileView === 'chat' ? 'hidden lg:flex' : 'flex'} h-full flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-surface shrink-0 lg:shrink transition-width duration-300 ease-in-out`}
-            >
-                {/* Navbar */}
-                <div className="h-14 flex items-center justify-between px-6 border-b border-border bg-surface/80 backdrop-blur z-20 shrink-0">
-                    <div className="flex items-center gap-2 sm:gap-4 overflow-hidden py-1">
-                        <button onClick={() => navigate(`/subject/${subjectId}`)} className="p-1.5 rounded-lg hover:bg-raised text-ink-3 hover:text-ink transition-colors shrink-0">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                        </button>
-                        <h1 className="font-bold text-xs sm:text-base text-ink line-clamp-2 leading-tight py-0.5">{chapter.chapterTitle}</h1>
+        <div className="flex flex-col h-screen w-full bg-void font-sans pt-[56px] overflow-hidden">
+
+            {/* ── Chapter TopBar (Desktop mostly, mobile partially) ── */}
+            <div className="sticky top-[56px] h-[52px] bg-surface/80 backdrop-blur-[20px] border-b border-border z-[90] flex items-center justify-between px-4 shrink-0 shadow-sm" style={{ WebkitBackdropFilter: 'blur(20px)' }}>
+                {/* Left: Back & Title */}
+                <div className="flex items-center gap-1 sm:gap-2 overflow-hidden flex-1 select-none">
+                    <button onClick={() => navigate(`/subject/${subjectId}`)} className="p-1.5 rounded-lg hover:bg-raised text-ink-2 hover:text-ink transition-colors group">
+                        <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 group-hover:-translate-x-0.5 transition-transform" />
+                    </button>
+                    <h1 className="font-[Geist] font-bold text-[13px] sm:text-[14px] text-ink uppercase tracking-[0.06em] truncate max-w-[260px]">{chapter.chapterTitle}</h1>
+                </div>
+
+                {/* Center: Desktop Tabs */}
+                {!isMobile && (
+                    <div className="bg-raised rounded-[var(--r-lg)] p-[3px] flex gap-[2px] border border-border/50">
+                        {(['mindmap', 'summary', 'keywords'] as const).map(tab => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`relative px-3.5 py-1.5 font-[Geist] font-semibold text-[12px] tracking-[0.08em] uppercase rounded-[var(--r-md)] transition-colors duration-150 z-10 select-none ${activeTab === tab ? 'text-white' : 'text-ink-3 hover:text-ink-2'}`}
+                            >
+                                {activeTab === tab && (
+                                    <motion.div
+                                        layoutId="desktopActiveTab"
+                                        className="absolute inset-0 bg-brand rounded-[var(--r-md)] shadow-[0_2px_8px_rgba(59,130,246,0.3)] -z-10"
+                                        transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                                    />
+                                )}
+                                {tab}
+                            </button>
+                        ))}
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="flex bg-void rounded-lg p-0.5 sm:p-1 border border-border shadow-sm shrink-0 relative">
-                            {(['mindmap', 'summary', 'keywords'] as const).map(tab => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    className={`relative px-2 sm:px-4 py-1 text-[9px] sm:text-[11px] font-bold uppercase tracking-wider sm:tracking-widest rounded-md transition-all z-10 ${activeTab === tab ? 'text-white' : 'text-ink-3 hover:text-ink-2'}`}
-                                >
-                                    {activeTab === tab && (
-                                        <motion.div
-                                            layoutId="activeTab"
-                                            className="absolute inset-0 bg-brand rounded-md shadow-md -z-10"
-                                            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                                        />
-                                    )}
-                                    {tab === 'mindmap' && isMobile ? 'Map' : tab}
-                                </button>
-                            ))}
-                        </div>
-                        {/* Chat Toggle Button */}
+                )}
+
+                {/* Right: Layout Toggles */}
+                {!isMobile && (
+                    <div className="flex items-center gap-1 sm:gap-2 flex-1 justify-end pl-4">
+                        <button className="p-2 rounded-lg text-ink-3 hover:bg-raised transition-colors">
+                            <LayoutGrid className="w-4 h-4" />
+                        </button>
+                        <div className="w-px h-4 bg-border mx-1" />
                         <button
-                            onClick={() => setLayout(layout === 'split' ? 'left' : 'split')}
-                            className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg hover:bg-raised text-ink-3 hover:text-ink transition-colors border border-border bg-surface shadow-sm"
-                            title={layout === 'split' ? "Close Chat Panel" : "Open Chat Panel"}
+                            onClick={() => setChatOpen(!chatOpen)}
+                            className={`p-2 rounded-lg transition-colors border shadow-sm ${chatOpen ? 'bg-surface border-brand/30 text-brand outline outline-1 outline-brand/10' : 'bg-surface border-border text-ink-3 hover:bg-raised hover:text-ink'}`}
+                            title="Toggle Tutor Panel"
                         >
-                            {layout === 'split' ? (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="15" y1="3" x2="15" y2="21"></line><polyline points="10 8 13 12 10 16"></polyline></svg>
-                            ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="15" y1="3" x2="15" y2="21"></line><polyline points="10 16 7 12 10 8"></polyline></svg>
-                            )}
+                            <PanelRight className="w-4 h-4" />
                         </button>
                     </div>
-                </div>
+                )}
+            </div>
 
-                {/* Content Area */}
-                <div className="flex-1 relative overflow-hidden bg-void">
-                    <AnimatePresence mode="wait">
-                        {activeTab === 'mindmap' ? (
-                            chapter.mindMap ? (
-                                <motion.div key="mindmap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0">
-                                    <MindMap data={chapter.mindMap} onNodeSelect={handleNodeSelect} activeNodeId={selectedNode?.id || null} />
-                                </motion.div>
-                            ) : (
-                                <motion.div key="nomindmap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 flex items-center justify-center text-ink-3 text-sm">
-                                    Mind map not generated yet.
-                                </motion.div>
-                            )
-                        ) : activeTab === 'summary' ? (
-                            <motion.div key="summary" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-8 max-w-3xl mx-auto h-full overflow-y-auto">
-                                <h2 className="text-2xl font-bold font-[Instrument_Serif] mb-6 text-brand">Chapter Summary</h2>
-                                <div className="prose prose-p:text-ink-2 prose-strong:text-ink prose-sm dark:prose-invert max-w-none">
-                                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{chapter.summary || 'Summary not available.'}</ReactMarkdown>
-                                </div>
-                            </motion.div>
-                        ) : (
-                            <motion.div key="keywords" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-8 h-full overflow-y-auto">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {(chapter.keywords || []).map((kw, i) => (
-                                        <div key={i} className="bg-surface border border-border p-4 rounded-xl hover:border-brand/40 transition-colors">
-                                            <h4 className="font-bold text-brand mb-1">{kw.term}</h4>
-                                            <p className="text-sm text-ink-2">{kw.definition}</p>
-                                        </div>
-                                    ))}
-                                    {!chapter.keywords?.length && <div className="col-span-2 text-center py-10 text-ink-3">No keywords available.</div>}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-            </motion.div>
+            {/* ── Main Layout ── */}
+            <div className="flex flex-1 overflow-hidden relative w-full h-full">
 
-            {/* ── Right Panel (Tutor Chat) ──────────────────────────────── */}
-            <AnimatePresence>
-                {(layout !== 'left' || isMobile) && (
-                    <motion.div
-                        initial={isMobile ? { opacity: 0 } : { opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: isMobile ? '100%' : (layout === 'right' ? '100%' : '40%') }}
-                        exit={isMobile ? { opacity: 0 } : { opacity: 0, width: 0 }}
-                        transition={{ type: 'spring', stiffness: 200, damping: 30 }}
-                        className={`w-full ${layout === 'right' ? 'lg:w-full' : 'lg:w-2/5'} ${mobileView === 'content' ? 'hidden lg:flex' : 'flex'} flex-1 h-full flex flex-col bg-void relative overflow-hidden shrink-0 border-t lg:border-t-0 border-border`}
+                {/* Left Panel / Content Area */}
+                <motion.div
+                    animate={{ width: isMobile ? '100%' : (chatOpen ? `${leftPanelWidth}%` : '100%') }}
+                    transition={{ type: 'spring', stiffness: 200, damping: 30 }}
+                    className="h-full relative overflow-hidden bg-void flex-shrink-0 z-10"
+                >
+                    <MappedContent />
+                </motion.div>
+
+                {/* Drag Handle */}
+                {!isMobile && chatOpen && (
+                    <div
+                        onMouseDown={handleMouseDown}
+                        className="w-1 h-full cursor-col-resize hover:bg-brand/50 transition-colors flex shrink-0 items-center justify-center relative z-20 group"
                     >
-                        {/* Chat Header */}
-                        <div className="h-14 flex items-center justify-between px-6 border-b border-border shadow-sm bg-surface/90 backdrop-blur z-20 shrink-0">
-                            <div className="flex items-center gap-3">
-                                <div className="relative flex items-center justify-center w-6 h-6 rounded-md bg-brand/10 border border-brand/20">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-brand glow-brand animate-pulse" />
-                                </div>
-                                <span className="font-bold text-sm text-ink tracking-tight uppercase">Tutor</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-ink-3 font-mono font-bold uppercase tracking-widest border border-border px-2 py-0.5 rounded shadow-sm hidden sm:inline-block">GPT-4 Class</span>
-                                <button
-                                    onClick={() => setLayout(layout === 'split' ? 'right' : 'split')}
-                                    className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg hover:bg-raised text-ink-3 hover:text-ink transition-colors border border-border bg-surface shadow-sm"
-                                    title={layout === 'split' ? "Expand Chat Full Screen" : "Split View"}
-                                >
-                                    {layout === 'split' ? (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
-                                    ) : (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
+                        <div className="w-[1px] h-[20%] bg-brand/0 group-hover:bg-brand rounded-full transition-colors" />
+                    </div>
+                )}
 
-                        {/* Messages */}
-                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-                            {chatHistory.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-                                    <div className="w-16 h-16 rounded-2xl bg-surface border border-border/50 flex items-center justify-center mb-6 shadow-xl shadow-brand/5">
-                                        <svg className="w-8 h-8 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                                    </div>
-                                    <h3 className="font-[Instrument_Serif] text-3xl text-ink mb-2 tracking-tight">Hello, {user.name.split(' ')[0]}</h3>
-                                    <p className="text-sm text-ink-3 mb-8">Concept mastery starts with a single question.</p>
-                                    <div className="w-full space-y-2 text-left">
-                                        {["Give me an overview of this chapter.", "Explain the most difficult concept simply.", "Generate a 3-question quiz."].map((p, i) => (
-                                            <button key={i} onClick={() => handleSend(p)} className="w-full p-3.5 bg-surface border border-border rounded-xl text-xs font-medium text-ink-2 hover:border-brand/40 hover:shadow-[0_2px_12px_rgba(var(--color-brand),0.05)] transition-all flex items-center gap-3 group">
-                                                <div className="w-6 h-6 rounded flex items-center justify-center bg-raised text-brand/50 group-hover:text-brand transition-colors">→</div>
-                                                {p}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : chatHistory.map(m => (
-                                <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[85%] rounded-3xl p-5 shadow-sm ${m.role === 'user' ? 'bg-brand text-white shadow-brand/10 rounded-br-sm' : 'bg-surface border border-border/60 text-ink rounded-bl-sm'}`}>
-                                        {m.role === 'user' ? (
-                                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
-                                        ) : m.status === 'typing' ? (
-                                            <div className="flex gap-1.5 items-center h-4">
-                                                {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full bg-brand/50 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
-                                            </div>
-                                        ) : m.status === 'error' ? (
-                                            <p className="text-danger text-sm">{m.content}</p>
-                                        ) : (
-                                            <TypewriterResponse html={m.parsed?.answer || m.content} />
-                                        )}
-                                        {m.role === 'assistant' && m.status === 'done' && (
-                                            <div className="mt-3 pt-3 border-t border-border/50 flex justify-end">
-                                                <button onClick={() => navigator.clipboard.writeText(m.parsed?.answer || m.content)} className="text-xs text-ink-3 hover:text-ink transition-colors px-2 py-1 flex items-center gap-1.5">
-                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                                                    Copy
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            ))}
-                            <div ref={chatEndRef} className="h-4" />
-                        </div>
-
-                        {/* Input */}
-                        <div className="p-4 sm:p-6 bg-void shrink-0 pb-safe border-t border-border/30">
-                            <form onSubmit={e => { e.preventDefault(); handleSend(); }} className="flex items-end gap-3 bg-surface border border-border rounded-[24px] p-2 pl-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)] focus-within:ring-2 focus-within:ring-brand/30 focus-within:border-brand transition-all relative">
-                                <textarea
-                                    value={input}
-                                    onChange={e => setInput(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                                    placeholder="Ask ALUCIDATE Tutor anything..."
-                                    className="flex-1 max-h-32 min-h-[44px] bg-transparent text-sm text-ink placeholder:text-ink-3 resize-none outline-none py-3"
-                                    rows={1}
-                                />
-                                <button type="submit" disabled={!input.trim()} className="absolute right-2 bottom-2 bg-brand hover:bg-brand-dim text-white disabled:bg-raised disabled:text-ink-3 disabled:border-border transition-all w-10 h-10 flex items-center justify-center shrink-0 rounded-full disabled:shadow-none shadow-brand/20">
-                                    <svg className="w-4 h-4 translate-x-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" /></svg>
-                                </button>
-                            </form>
-                            <p className="text-center text-[10px] text-ink-3 mt-3">Alucidate AI may produce inaccurate information about people, places, or facts.</p>
-                        </div>
+                {/* Right Panel / Tutor Chat */}
+                {!isMobile && (
+                    <motion.div
+                        animate={{
+                            width: chatOpen ? `${100 - leftPanelWidth}%` : '0%',
+                            opacity: chatOpen ? 1 : 0
+                        }}
+                        transition={{ type: 'spring', stiffness: 200, damping: 30 }}
+                        className="h-full relative overflow-hidden bg-void border-l border-border z-10 flex-shrink-0"
+                    >
+                        {chatOpen && (
+                            <TutorPanel
+                                chatHistory={chatHistory}
+                                onSend={handleSendMsg}
+                                onExpandToggle={() => setLeftPanelWidth(l => l <= 40 ? 58 : 30)}
+                                isExpanded={leftPanelWidth <= 40}
+                                selectedNode={selectedNode}
+                                onClearNode={() => setSelectedNode(null)}
+                                subjectName={subject.subject}
+                                chapterName={chapter.chapterTitle}
+                            />
+                        )}
                     </motion.div>
                 )}
-            </AnimatePresence>
-
-            {/* Mobile Navigation Toggle */}
-            <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 flex bg-surface/90 backdrop-blur-xl border border-border p-1.5 rounded-2xl shadow-2xl z-50">
-                <button
-                    onClick={() => setMobileView('content')}
-                    className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mobileView === 'content' ? 'bg-brand text-white shadow-lg' : 'text-ink-3'}`}
-                >
-                    Learn
-                </button>
-                <button
-                    onClick={() => setMobileView('chat')}
-                    className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mobileView === 'chat' ? 'bg-brand text-white shadow-lg' : 'text-ink-3'}`}
-                >
-                    Discuss
-                </button>
             </div>
+
+            {/* ── Mobile Bottom Navigation ── */}
+            {isMobile && (
+                <div className="fixed bottom-0 left-0 right-0 h-[56px] bg-surface/95 backdrop-blur-xl border-t border-border z-[100] flex justify-between items-center px-2 pb-safe shadow-[0_-4px_24px_rgba(0,0,0,0.5)]">
+                    {(['mindmap', 'summary', 'keywords', 'chat'] as const).map(tab => {
+                        const Icon = tab === 'mindmap' ? MapIcon : tab === 'summary' ? FileText : tab === 'keywords' ? Hash : MessageSquare;
+                        const isActive = mobileTab === tab;
+                        return (
+                            <button
+                                key={tab}
+                                onClick={() => setMobileTab(tab)}
+                                className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 relative ${isActive ? 'text-brand' : 'text-ink-3'}`}
+                            >
+                                <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110' : ''}`} />
+                                <span className={`font-mono text-[10px] uppercase tracking-wider ${isActive ? 'font-bold' : 'font-medium'}`}>
+                                    {tab === 'mindmap' ? 'Map' : tab}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
         </div>
     );
 };
