@@ -22,7 +22,8 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
 app.use(cors({
     origin: (origin, callback) => {
         if (origin) console.log(`[CORS] Request from origin: ${origin}`);
-        if (!origin || allowedOrigins.includes(origin) || origin.includes('localhost')) {
+        const isLocalDev = origin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+        if (!origin || allowedOrigins.includes(origin) || isLocalDev) {
             callback(null, true);
         } else {
             console.warn(`[CORS] Rejection: Origin ${origin} not in whitelist: ${allowedOrigins.join(', ')}`);

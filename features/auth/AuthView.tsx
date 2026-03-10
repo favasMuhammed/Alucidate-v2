@@ -18,7 +18,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
     const [className, setClassName] = useState('Class 11');
-    const [role, setRole] = useState<'student' | 'admin'>('student');
+
 
     // Entrance Exam specific fields
     const [isEntrance, setIsEntrance] = useState(false);
