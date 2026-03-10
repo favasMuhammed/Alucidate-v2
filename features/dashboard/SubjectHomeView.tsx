@@ -5,12 +5,7 @@ import { SubjectData, ChapterDetails } from '@/types';
 import { dbService } from '@/services/dbService';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
-
-function hashStringToHue(str: string): number {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    return Math.abs(hash % 360);
-}
+import { hashStringToHue } from '@/utils';
 
 const ParticleField = () => (
     <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">

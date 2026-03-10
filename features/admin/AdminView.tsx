@@ -7,16 +7,11 @@ import { dbService } from '@/services/dbService';
 import { generateChapterDetails_Interactive } from '@/services/aiService';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
+import { hashStringToHue } from '@/utils';
 
 // pdfjs loaded via CDN in index.html
 // @ts-ignore
 declare const pdfjsLib: any;
-
-function hashStringToHue(str: string): number {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    return Math.abs(hash % 360);
-}
 
 export const AdminView: React.FC = () => {
     const { user } = useAuth();

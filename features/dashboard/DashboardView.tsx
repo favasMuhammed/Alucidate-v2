@@ -5,6 +5,7 @@ import { SubjectData } from '@/types';
 import { dbService } from '@/services/dbService';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
+import { hashStringToHue } from '@/utils';
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -13,14 +14,6 @@ function getGreeting() {
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
-}
-
-function hashStringToHue(str: string): number {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return Math.abs(hash % 360);
 }
 
 // ── Components ──────────────────────────────────────────────────────
