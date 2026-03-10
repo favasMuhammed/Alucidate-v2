@@ -5,7 +5,7 @@
  * Structured data (users, subjects, chapters, conversations) → Supabase PostgreSQL
  * PDF binary cache (large Base64 files) → IndexedDB (device-local, for performance)
  */
-import { User, SubjectData, ChapterDetails } from '@/types';
+import { User, SubjectData, ChapterDetails, Class } from '@/types';
 import { supabase } from './supabaseClient';
 
 // ─── IndexedDB PDF Cache ────────────────────────────────────────────────────
@@ -55,6 +55,36 @@ export const dbService = {
         if (error) throw new Error(`Failed to save user: ${error.message}`);
     },
 
+    // ── Classes ─────────────────────────────────────────────────────────────
+
+    async getClasses(): Promise<Class[]> {
+        const { data, error } = await supabase
+            .from('classes')
+            .select('*')
+            .order('name', { ascending: true });
+        if (error || !data) return [];
+        return data as Class[];
+    },
+
+    async saveClass(cls: Class): Promise<void> {
+        const { error } = await supabase
+            .from('classes')
+            .upsert({
+                id: cls.id,
+                name: cls.name,
+                type: cls.type,
+            });
+        if (error) throw new Error(`Failed to save class: ${error.message}`);
+    },
+
+    async deleteClass(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('classes')
+            .delete()
+            .eq('id', id);
+        if (error) throw new Error(`Failed to delete class: ${error.message}`);
+    },
+
     // ── Subjects ───────────────────────────────────────────────────────────
 
     async getSubjectsByClass(className: string): Promise<SubjectData[]> {
@@ -67,7 +97,22 @@ export const dbService = {
             id: row.id,
             className: row.class_name,
             subject: row.subject,
-            files: [], // PDFs are cached in IndexedDB, not fetched by default
+            files: [],
+            structure: row.structure,
+        }));
+    },
+
+    async getAllSubjects(): Promise<SubjectData[]> {
+        const { data, error } = await supabase
+            .from('subjects')
+            .select('*')
+            .order('class_name', { ascending: true });
+        if (error || !data) return [];
+        return data.map(row => ({
+            id: row.id,
+            className: row.class_name,
+            subject: row.subject,
+            files: [],
             structure: row.structure,
         }));
     },
@@ -223,8 +268,6 @@ export const dbService = {
     },
 
     async clearDB(): Promise<void> {
-        // Clear Supabase data is done via Supabase dashboard.
-        // This clears the local PDF cache only.
         return new Promise((resolve, reject) => {
             const req = indexedDB.deleteDatabase(PDF_DB_NAME);
             req.onsuccess = () => resolve();

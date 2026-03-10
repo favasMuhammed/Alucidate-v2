@@ -6,6 +6,13 @@ export interface User {
   role: 'admin' | 'student';
 }
 
+export interface Class {
+  id: string;
+  name: string;
+  type: 'class' | 'entrance';
+}
+
+
 // --- Core Data Structures ---
 
 export interface FileContent {

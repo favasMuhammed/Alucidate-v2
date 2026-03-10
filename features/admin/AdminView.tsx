@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { SubjectData, ChapterDetails } from '@/types';
+import { SubjectData, ChapterDetails, Class } from '@/types';
+
 import { dbService } from '@/services/dbService';
 import { generateChapterDetails_Interactive } from '@/services/aiService';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -32,17 +33,39 @@ export const AdminView: React.FC = () => {
     const [processError, setProcessError] = useState('');
     const [processProgress, setProcessProgress] = useState(0);
 
+    // Phase 7: Class Management
+    const [classes, setClasses] = useState<Class[]>([]);
+    const [selectedClassName, setSelectedClassName] = useState<string>('All');
+    const [isManagingClasses, setIsManagingClasses] = useState(false);
+    const [newClassName, setNewClassName] = useState('');
+    const [newClassType, setNewClassType] = useState<'class' | 'entrance'>('class');
+    const [subjectClassSelection, setSubjectClassSelection] = useState('');
+
+
     const activeSubject = subjects.find(s => s.id === activeSubjectId) || null;
 
     useEffect(() => {
         if (!user) return;
+        loadClasses();
         loadSubjects();
-    }, [user?.className]);
+    }, [user, selectedClassName]);
+
+    const loadClasses = async () => {
+        const data = await dbService.getClasses();
+        setClasses(data);
+        if (data.length > 0 && !subjectClassSelection) setSubjectClassSelection(data[0].name);
+    };
 
     const loadSubjects = async () => {
         if (!user) return;
+        setLoading(true);
         try {
-            const data = await dbService.getSubjectsByClass(user.className);
+            let data: SubjectData[] = [];
+            if (selectedClassName === 'All') {
+                data = await dbService.getAllSubjects();
+            } else {
+                data = await dbService.getSubjectsByClass(selectedClassName);
+            }
             setSubjects(data);
             if (data.length > 0 && !activeSubjectId) setActiveSubjectId(data[0].id);
         } catch (e) {
@@ -52,16 +75,18 @@ export const AdminView: React.FC = () => {
         }
     };
 
+
     const handleCreateSubject = async (e: React.FormEvent) => {
         e.preventDefault();
         const name = newSubjectName.trim();
-        if (!name || !user) return;
+        const targetClass = subjectClassSelection || user?.className;
+        if (!name || !targetClass) return;
         setLoading(true);
         try {
             const newId = crypto.randomUUID();
             await dbService.saveSubject({
                 id: newId,
-                className: user.className,
+                className: targetClass,
                 subject: name,
                 files: [],
                 structure: { id: 'root', title: name, children: [], startPage: 0, endPage: 0, fileName: '' }
@@ -76,6 +101,33 @@ export const AdminView: React.FC = () => {
             setLoading(false);
         }
     };
+
+    const handleCreateClass = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newClassName.trim()) return;
+        try {
+            await dbService.saveClass({
+                id: crypto.randomUUID(),
+                name: newClassName.trim(),
+                type: newClassType
+            });
+            setNewClassName('');
+            loadClasses();
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleDeleteClass = async (id: string) => {
+        if (!confirm('Are you sure? This will not delete subjects in this class, but they will become harder to find.')) return;
+        try {
+            await dbService.deleteClass(id);
+            loadClasses();
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
 
     const processAndSave = async (file: File) => {
         if (!activeSubject) return;
@@ -165,16 +217,46 @@ export const AdminView: React.FC = () => {
             <aside className="w-[280px] border-r border-border flex flex-col pt-6 pb-4 shrink-0">
                 <div className="px-6 mb-4 flex items-center justify-between">
                     <h2 className="text-xs font-bold uppercase tracking-widest text-ink-3">Course Manager</h2>
-                    <button onClick={() => { setIsCreating(true); setTimeout(() => inputRef.current?.focus(), 100); }} className="text-brand hover:text-brand-dim transition-colors">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={() => setIsManagingClasses(true)} title="Manage Classes" className="text-ink-3 hover:text-brand transition-colors">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        </button>
+                        <button onClick={() => { setIsCreating(true); setTimeout(() => inputRef.current?.focus(), 100); }} title="Add Subject" className="text-brand hover:text-brand-dim transition-colors">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                        </button>
+                    </div>
                 </div>
+
+                {/* Class Filter */}
+                <div className="px-4 mb-4">
+                    <select
+                        value={selectedClassName}
+                        onChange={(e) => setSelectedClassName(e.target.value)}
+                        className="w-full bg-surface border border-border text-sm px-3 py-2 rounded-lg outline-none cursor-pointer focus:border-brand"
+                    >
+                        <option value="All">All Classes</option>
+                        {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                </div>
+
                 <div className="flex-1 overflow-y-auto px-4 space-y-1">
                     {isCreating && (
-                        <form onSubmit={handleCreateSubject} className="mb-2 w-full">
-                            <input ref={inputRef} type="text" placeholder="Module name..." value={newSubjectName} onChange={e => setNewSubjectName(e.target.value)} onBlur={() => !newSubjectName && setIsCreating(false)} className="w-full bg-surface border border-brand text-sm px-3 py-2 rounded-lg outline-none" />
+                        <form onSubmit={handleCreateSubject} className="mb-4 p-3 bg-surface border border-brand/30 rounded-xl space-y-2">
+                            <input ref={inputRef} type="text" placeholder="Subject name..." value={newSubjectName} onChange={e => setNewSubjectName(e.target.value)} className="w-full bg-void border border-border text-sm px-3 py-2 rounded-lg outline-none focus:border-brand" />
+                            <select
+                                value={subjectClassSelection}
+                                onChange={(e) => setSubjectClassSelection(e.target.value)}
+                                className="w-full bg-void border border-border text-xs px-2 py-1.5 rounded-lg outline-none focus:border-brand"
+                            >
+                                {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </select>
+                            <div className="flex gap-2">
+                                <button type="submit" className="flex-1 text-[10px] font-bold bg-brand text-void py-1.5 rounded-md">CREATE</button>
+                                <button type="button" onClick={() => setIsCreating(false)} className="px-3 text-[10px] font-bold text-ink-3">CANCEL</button>
+                            </div>
                         </form>
                     )}
+
                     {loading ? <LoadingSpinner /> : subjects.map(subject => {
                         const isActive = activeSubjectId === subject.id;
                         const hue = hashStringToHue(subject.subject);
@@ -185,7 +267,12 @@ export const AdminView: React.FC = () => {
                                 <div className="w-8 h-8 rounded-lg flex shrink-0 border border-border/50" style={{ background: `linear-gradient(135deg, hsl(${hue},70%,50%), hsl(${hue + 30},60%,35%))` }} />
                                 <div className="flex-1 min-w-0 pr-2 text-left flex flex-col">
                                     <span className="text-sm font-semibold truncate text-ink">{subject.subject}</span>
-                                    <span className="text-[10px] text-ink-3 uppercase tracking-wider">{chCount} Chapters</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[9px] text-brand font-bold uppercase">{subject.className}</span>
+                                        <span className="text-[9px] text-ink-3">•</span>
+                                        <span className="text-[9px] text-ink-3 uppercase tracking-wider">{chCount} Chapters</span>
+                                    </div>
+
                                 </div>
                             </button>
                         );
@@ -280,7 +367,46 @@ export const AdminView: React.FC = () => {
                             </AnimatePresence>
                         </div>
                     </>
+                ) : isManagingClasses ? (
+                    <div className="flex-1 overflow-y-auto p-8">
+                        <div className="max-w-4xl mx-auto">
+                            <div className="flex items-center justify-between mb-8">
+                                <h1 className="text-3xl font-bold text-ink">Manage Classes</h1>
+                                <button onClick={() => setIsManagingClasses(false)} className="text-sm font-bold text-brand h-10 px-4 rounded-xl hover:bg-brand/10">CLOSE</button>
+                            </div>
+
+                            <form onSubmit={handleCreateClass} className="bg-surface border border-border p-6 rounded-2xl mb-8 flex gap-4 items-end">
+                                <div className="flex-1 space-y-2">
+                                    <label className="text-xs font-bold text-ink-3 uppercase">Class Name</label>
+                                    <input type="text" value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="e.g. Class 12, NEET..." className="w-full bg-void border border-border px-4 py-2.5 rounded-xl outline-none focus:border-brand" />
+                                </div>
+                                <div className="w-48 space-y-2">
+                                    <label className="text-xs font-bold text-ink-3 uppercase">Type</label>
+                                    <select value={newClassType} onChange={e => setNewClassType(e.target.value as any)} className="w-full bg-void border border-border px-4 py-2.5 rounded-xl outline-none focus:border-brand">
+                                        <option value="class">Regular Class</option>
+                                        <option value="entrance">Entrance Exam</option>
+                                    </select>
+                                </div>
+                                <button type="submit" className="h-11 bg-brand text-void px-8 rounded-xl font-bold hover:bg-brand-dim transition-all">ADD CLASS</button>
+                            </form>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {classes.map(c => (
+                                    <div key={c.id} className="bg-surface border border-border p-5 rounded-2xl flex items-center justify-between group">
+                                        <div>
+                                            <h3 className="font-bold text-ink">{c.name}</h3>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-brand">{c.type}</span>
+                                        </div>
+                                        <button onClick={() => handleDeleteClass(c.id)} className="opacity-0 group-hover:opacity-100 p-2 text-ink-3 hover:text-danger hover:bg-danger/10 rounded-lg transition-all">
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 ) : loading ? (
+
                     <div className="h-full flex items-center justify-center"><LoadingSpinner /></div>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-void">

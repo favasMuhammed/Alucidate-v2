@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User } from '@/types';
+import { User, Class, SubjectData } from '@/types';
+
 import { dbService } from '@/services/dbService';
 import { sendOTP, verifyOTP } from '@/services/otpService';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -23,6 +24,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
     const [isEntrance, setIsEntrance] = useState(false);
     const [entranceName, setEntranceName] = useState('');
     const [entranceSubjects, setEntranceSubjects] = useState<string[]>([]);
+    const [availableSubjects, setAvailableSubjects] = useState<SubjectData[]>([]);
+    const [classes, setClasses] = useState<Class[]>([]);
+
 
     const ADMIN_EMAILS = ['nayrix2025@gmail.com', 'info@nayix.com'];
 
@@ -34,6 +38,39 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [cooldown, setCooldown] = useState(0);
+
+    useEffect(() => {
+        loadClasses();
+    }, []);
+
+    const loadClasses = async () => {
+        try {
+            const data = await dbService.getClasses();
+            setClasses(data);
+            if (data.length > 0) {
+                const firstRegular = data.find(c => c.type === 'class');
+                if (firstRegular) setClassName(firstRegular.name);
+            }
+        } catch (err) {
+            console.error('Failed to load classes:', err);
+        }
+    };
+
+    useEffect(() => {
+        if (isEntrance && entranceName) {
+            loadSubjectsForEntrance(entranceName);
+        }
+    }, [isEntrance, entranceName]);
+
+    const loadSubjectsForEntrance = async (clsName: string) => {
+        try {
+            const subs = await dbService.getSubjectsByClass(clsName);
+            setAvailableSubjects(subs);
+        } catch (err) {
+            console.error('Failed to load subjects:', err);
+        }
+    };
+
 
     // Form variants for Framer Motion
     const formVariants = {
@@ -297,8 +334,11 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                                                         value={isEntrance ? 'Entrance Exam' : className}
                                                         onChange={e => {
                                                             const val = e.target.value;
-                                                            if (val === 'Entrance Exam') {
+                                                            const selectedClass = classes.find(c => c.name === val);
+                                                            if (selectedClass?.type === 'entrance') {
                                                                 setIsEntrance(true);
+                                                                setEntranceName(val);
+                                                                setEntranceSubjects([]);
                                                             } else {
                                                                 setIsEntrance(false);
                                                                 setClassName(val);
@@ -306,12 +346,12 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                                                         }}
                                                         className="w-full bg-raised border border-border rounded-lg px-3 py-2.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand outline-none appearance-none"
                                                     >
-                                                        {Array.from({ length: 12 }, (_, i) => (
-                                                            <option key={i + 1} value={`Class ${i + 1}`}>Class {i + 1}</option>
+                                                        {classes.map(c => (
+                                                            <option key={c.id} value={c.name}>{c.name} {c.type === 'entrance' ? '(Entrance)' : ''}</option>
                                                         ))}
-                                                        <option value="Entrance Exam">Entrance Exam</option>
                                                     </select>
                                                 </div>
+
 
                                                 <AnimatePresence>
                                                     {isEntrance && (
@@ -333,21 +373,19 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                                                                 />
                                                             </div>
                                                             <div>
-                                                                <label className="block text-xs font-semibold text-ink-3 mb-2 uppercase tracking-wider">Select Subjects (2-4)</label>
+                                                                <label className="block text-xs font-semibold text-ink-3 mb-2 uppercase tracking-wider">Select Subjects (Min 1)</label>
                                                                 <div className="flex flex-wrap gap-2">
-                                                                    {['Maths', 'Physics', 'Chemistry', 'Biology', 'Extra'].map(sub => {
-                                                                        const isSelected = entranceSubjects.includes(sub);
+                                                                    {availableSubjects.map(sub => {
+                                                                        const isSelected = entranceSubjects.includes(sub.subject);
                                                                         return (
                                                                             <button
-                                                                                key={sub}
+                                                                                key={sub.id}
                                                                                 type="button"
                                                                                 onClick={() => {
                                                                                     if (isSelected) {
-                                                                                        setEntranceSubjects(prev => prev.filter(s => s !== sub));
+                                                                                        setEntranceSubjects(prev => prev.filter(s => s !== sub.subject));
                                                                                     } else {
-                                                                                        if (entranceSubjects.length < 4) {
-                                                                                            setEntranceSubjects(prev => [...prev, sub]);
-                                                                                        }
+                                                                                        setEntranceSubjects(prev => [...prev, sub.subject]);
                                                                                     }
                                                                                 }}
                                                                                 className={`px-3 py-1.5 text-xs font-bold rounded-md border transition-all ${isSelected
@@ -355,12 +393,16 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                                                                                     : 'bg-surface border-border text-ink-3 hover:border-border-subtle hover:text-ink'
                                                                                     }`}
                                                                             >
-                                                                                {sub}
+                                                                                {sub.subject}
                                                                             </button>
                                                                         );
                                                                     })}
+                                                                    {availableSubjects.length === 0 && (
+                                                                        <p className="text-xs text-ink-3 italic">No subjects available for this exam yet.</p>
+                                                                    )}
                                                                 </div>
                                                             </div>
+
                                                         </motion.div>
                                                     )}
                                                 </AnimatePresence>
