@@ -10,6 +10,7 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 const DashboardView = lazy(() => import('./features/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 const AdminView = lazy(() => import('./features/admin/AdminView').then(m => ({ default: m.AdminView })));
 const SubjectHomeView = lazy(() => import('./features/dashboard/SubjectHomeView').then(m => ({ default: m.SubjectHomeView })));
+const SubjectChatView = lazy(() => import('./features/dashboard/SubjectChatView').then(m => ({ default: m.SubjectChatView })));
 const ChapterView = lazy(() => import('./features/chapter/ChapterView').then(m => ({ default: m.ChapterView })));
 
 // ── Loading Fallback ───────────────────────────────────────────────────────
@@ -48,13 +49,28 @@ export const router = createBrowserRouter([
             },
             {
                 path: 'subject/:subjectId',
-                element: (
-                    <AuthGuard>
-                        <React.Suspense fallback={<PageLoader />}>
-                            <SubjectHomeView />
-                        </React.Suspense>
-                    </AuthGuard>
-                ),
+                children: [
+                    {
+                        index: true,
+                        element: (
+                            <AuthGuard>
+                                <React.Suspense fallback={<PageLoader />}>
+                                    <SubjectHomeView />
+                                </React.Suspense>
+                            </AuthGuard>
+                        ),
+                    },
+                    {
+                        path: 'chat',
+                        element: (
+                            <AuthGuard>
+                                <React.Suspense fallback={<PageLoader />}>
+                                    <SubjectChatView />
+                                </React.Suspense>
+                            </AuthGuard>
+                        ),
+                    },
+                ],
             },
             {
                 path: 'subject/:subjectId/chapter/:chapterId',

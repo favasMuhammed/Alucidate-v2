@@ -100,13 +100,28 @@ export const SubjectHomeView: React.FC = () => {
             >
                 <ParticleField />
                 <div className="absolute inset-0 bg-void/20" />
-                <div className="relative z-10 w-full max-w-[1280px] mx-auto">
-                    <nav className="flex items-center gap-2 text-white/50 text-xs font-bold uppercase tracking-widest mb-4">
-                        <button onClick={() => navigate('/dashboard')} className="hover:text-white transition-colors">Dashboard</button>
-                        <span>/</span>
-                        <span className="text-white/80">{subject.subject}</span>
-                    </nav>
-                    <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">{subject.subject}</h1>
+                <div className="relative z-10 w-full max-w-[1280px] mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div>
+                        <nav className="flex items-center gap-2 text-white/50 text-xs font-bold uppercase tracking-widest mb-4">
+                            <button onClick={() => navigate('/dashboard')} className="hover:text-white transition-colors">Dashboard</button>
+                            <span>/</span>
+                            <span className="text-white/80">{subject.subject}</span>
+                        </nav>
+                        <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">{subject.subject}</h1>
+                    </div>
+
+                    <button
+                        onClick={() => navigate(`/subject/${subjectId}/chat`)}
+                        className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white px-6 py-3 rounded-2xl flex items-center gap-3 transition-all group shrink-0 self-start md:self-auto mb-2"
+                    >
+                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                        </div>
+                        <div className="text-left">
+                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 leading-tight">Subject Intelligence</p>
+                            <p className="text-sm font-bold">Ask Alucidate Anything</p>
+                        </div>
+                    </button>
                 </div>
             </motion.div>
 
