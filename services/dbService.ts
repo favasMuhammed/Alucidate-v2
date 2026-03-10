@@ -158,6 +158,28 @@ export const dbService = {
 
     // ── Chapters ───────────────────────────────────────────────────────────
 
+    async deleteChapter(subjectId: string, chapterId: string, currentSubject: SubjectData): Promise<SubjectData> {
+        // 1. Delete the chapter details and mind map from the database
+        const { error } = await supabase
+            .from('chapters')
+            .delete()
+            .eq('subject_id', subjectId)
+            .eq('chapter_id', chapterId);
+        if (error) throw new Error(`Failed to delete chapter: ${error.message}`);
+
+        // 2. Remove the chapter node from the Subject's hierarchical mind map structure
+        const updatedSubject = { ...currentSubject };
+        if (updatedSubject.structure?.children) {
+            updatedSubject.structure.children = updatedSubject.structure.children.filter(
+                (ch: any) => ch.id !== chapterId
+            );
+        }
+
+        // 3. Save the modified subject back to the DB to reflect the deleted structure
+        await this.saveSubject(updatedSubject);
+        return updatedSubject;
+    },
+
     async getChapterDetails(id: string): Promise<ChapterDetails | undefined> {
         const { data, error } = await supabase
             .from('chapters')

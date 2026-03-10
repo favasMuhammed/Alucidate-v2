@@ -269,6 +269,34 @@ export const AdminView: React.FC = () => {
         await loadSubjects();
     };
 
+    const handleDeleteChapter = async (subjectId: string, chapterId: string, chapterTitle: string) => {
+        if (!activeSubject) return;
+        if (!confirm(`Are you sure you want to delete Chapter ${chapterId}: "${chapterTitle}"? This cannot be undone.`)) return;
+
+        setIsProcessing(true);
+        setProcessQueueText(`Deleting Chapter ${chapterId}...`);
+
+        try {
+            const updatedSubject = await dbService.deleteChapter(subjectId, chapterId, activeSubject);
+
+            // Update local state immediately
+            setSubjects(prev => prev.map(s => s.id === updatedSubject.id ? updatedSubject : s));
+
+            // Force active subject refresh to re-render the chapter list
+            if (activeSubjectId === updatedSubject.id) {
+                // state is technically rolled forward in `loadSubjects` anyway
+            }
+
+            await loadSubjects();
+        } catch (error: any) {
+            console.error('Failed to delete chapter:', error);
+            alert(`Failed to delete chapter: ${error.message || 'Unknown error'}`);
+        } finally {
+            setIsProcessing(false);
+            setProcessQueueText('');
+        }
+    };
+
     if (!user) return <LoadingSpinner fullScreen />;
 
     const renderProcessingUI = () => (
@@ -442,6 +470,15 @@ export const AdminView: React.FC = () => {
                                                     <div key={ch.id} className="relative group bg-surface/80 backdrop-blur-sm border border-border p-5 rounded-2xl flex flex-col hover:border-border-subtle hover:shadow-[var(--shadow-glow-purple)] transition-all duration-300">
                                                         <div className="flex items-start justify-between mb-2">
                                                             <span className="text-[10px] font-bold uppercase tracking-widest text-brand bg-brand/10 px-2 py-0.5 rounded-md">Chapter {ch.id}</span>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteChapter(activeSubject.id, ch.id, ch.title || ch.fileName); }}
+                                                                className="opacity-0 group-hover:opacity-100 p-1.5 text-ink-3 hover:text-danger hover:bg-danger/10 rounded-lg transition-all"
+                                                                title="Delete Chapter"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                </svg>
+                                                            </button>
                                                         </div>
                                                         <h4 className="font-bold text-ink mb-1 truncate">{ch.title || ch.fileName}</h4>
                                                         <p className="text-xs text-ink-3 font-mono mt-auto pt-4 flex items-center gap-2">
