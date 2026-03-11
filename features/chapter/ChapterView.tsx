@@ -154,7 +154,7 @@ export const ChapterView: React.FC = () => {
         if (isMobile) {
             if (mobileTab === 'chat') {
                 return (
-                    <div className="h-full w-full pb-[56px] relative overflow-hidden bg-void">
+                    <div className="h-full w-full relative overflow-hidden bg-void">
                         <TutorPanel
                             chatHistory={chatHistory}
                             onSend={handleSendMsg}
@@ -238,7 +238,7 @@ export const ChapterView: React.FC = () => {
             </div>
 
             {/* ── Main Layout ── */}
-            <div className="flex flex-1 overflow-hidden relative w-full h-full">
+            <div className="flex flex-1 overflow-hidden relative w-full h-full pb-[56px] lg:pb-0">
 
                 {/* Left Panel / Content Area */}
                 <motion.div

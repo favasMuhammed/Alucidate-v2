@@ -296,7 +296,7 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
             </motion.div>
 
             {/* Zoom/Pan Controls */}
-            <div className="absolute bottom-6 right-6 flex items-center gap-[1px] bg-raised-2 p-[1px] rounded-[var(--r-full)] overflow-hidden shadow-xl border border-border/50 backdrop-blur-md z-40">
+            <div className="absolute bottom-6 md:bottom-8 right-4 md:right-6 flex items-center gap-[1px] bg-raised-2 p-[1px] rounded-[var(--r-full)] overflow-hidden shadow-xl border border-border/50 backdrop-blur-md z-40">
                 <button
                     onClick={() => setTargetScale(s => Math.max(0.3, s - 0.2))}
                     className="w-9 h-9 flex items-center justify-center bg-raised-2 hover:bg-raised hover:text-ink transition-colors text-ink-2 font-mono text-[15px]"
