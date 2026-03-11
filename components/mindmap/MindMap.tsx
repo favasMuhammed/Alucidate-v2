@@ -138,10 +138,37 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
     }, [data, expandedNodes]);
 
     // Handle Zoom
+    const handleZoom = (delta: number, pointerX: number, pointerY: number) => {
+        setTargetScale(oldScale => {
+            const newScale = Math.min(Math.max(0.3, oldScale + delta), 2.5);
+            if (newScale === oldScale) return oldScale;
+
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (rect) {
+                const px = pointerX - rect.left;
+                const py = pointerY - rect.top;
+
+                const contentX = (px - panX.get()) / oldScale;
+                const contentY = (py - panY.get()) / oldScale;
+
+                panX.set(px - contentX * newScale);
+                panY.set(py - contentY * newScale);
+            }
+            return newScale;
+        });
+    };
+
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
         const delta = e.deltaY * -0.002;
-        setTargetScale(s => Math.min(Math.max(0.3, s + delta), 2.5));
+        handleZoom(delta, e.clientX, e.clientY);
+    };
+
+    const handleZoomStep = (step: number) => {
+        const rect = containerRef.current?.getBoundingClientRect();
+        const cx = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+        const cy = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+        handleZoom(step, cx, cy);
     };
 
     // Gliding Auto-Center
@@ -152,7 +179,7 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
             panX.set((dimensions.w / 2) - activeNode.x * targetScale);
             panY.set((dimensions.h / 2) - activeNode.y * targetScale);
         }
-    }, [activeNodeId, layoutNodes, dimensions.w, dimensions.h, targetScale, panX, panY]);
+    }, [activeNodeId, layoutNodes, dimensions.w, dimensions.h]);
 
     // Active path tracing
     const activePathSet = useMemo(() => {
@@ -183,7 +210,7 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
                     panY.set(panY.get() + info.delta.y);
                 }}
                 whileDrag={{ cursor: 'grabbing' }}
-                className="w-full h-full origin-top-left"
+                className="absolute left-0 top-0 w-[8000px] h-[8000px] origin-top-left"
                 style={{ x: springPanX, y: springPanY, scale: springScale }}
             >
                 <svg width="8000" height="8000" className="absolute inset-0 pointer-events-none overflow-visible">
@@ -309,7 +336,7 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
             {/* Zoom/Pan Controls */}
             <div className="absolute bottom-6 md:bottom-8 right-4 md:right-6 flex items-center gap-[1px] bg-raised-2 p-[1px] rounded-[var(--r-full)] overflow-hidden shadow-xl border border-border/50 backdrop-blur-md z-40">
                 <button
-                    onClick={() => setTargetScale(s => Math.max(0.3, s - 0.2))}
+                    onClick={() => handleZoomStep(-0.2)}
                     className="w-9 h-9 flex items-center justify-center bg-raised-2 hover:bg-raised hover:text-ink transition-colors text-ink-2 font-mono text-[15px]"
                 >
                     −
@@ -321,7 +348,7 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
                     Center
                 </button>
                 <button
-                    onClick={() => setTargetScale(s => Math.min(2.5, s + 0.2))}
+                    onClick={() => handleZoomStep(0.2)}
                     className="w-9 h-9 flex items-center justify-center bg-raised-2 hover:bg-raised hover:text-ink transition-colors text-ink-2 font-mono text-[15px]"
                 >
                     +
