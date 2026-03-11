@@ -29,7 +29,7 @@ export const ChapterView: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'mindmap' | 'summary' | 'keywords'>('mindmap');
     const [selectedNode, setSelectedNode] = useState<NodeType | null>(null);
     const [chatOpen, setChatOpen] = useState(true);
-    const [leftPanelWidth, setLeftPanelWidth] = useState(58); // %
+    const [leftPanelWidth, setLeftPanelWidth] = useState(40); // %
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
     const [mobileTab, setMobileTab] = useState<'mindmap' | 'summary' | 'keywords' | 'chat'>('mindmap');
 
@@ -95,25 +95,19 @@ export const ChapterView: React.FC = () => {
         window.addEventListener('mouseup', handleMouseUp);
     };
 
-    const handleSendMsg = async (text: string) => {
-        if (!text.trim() || !user || !subject || !chapter) return;
-        const msgId = Date.now().toString();
-        const userMsg = { id: `${msgId}_u`, role: 'user', content: text, status: 'done', timestamp: Date.now() };
-
-        setChatHistory(prev => [...prev, userMsg, { id: `${msgId}_a`, role: 'assistant', content: '', status: 'sending', timestamp: Date.now() + 1 }]);
-
+    const triggerGeneration = async (query: string, currentHistory: any[], assistantMsgId: string) => {
         const qsCount = parseInt(localStorage.getItem(`qs_${chapterId}`) || '0', 10) + 1;
         localStorage.setItem(`qs_${chapterId}`, qsCount.toString());
 
         try {
             const relevantFiles: any[] = [];
-            const chapterNode = subject.structure?.children?.find(c => c.id === chapterId);
+            const chapterNode = subject!.structure?.children?.find(c => c.id === chapterId);
             if (chapterNode?.fileName) {
                 const cachedPdf = await dbService.getPdfFromCache(chapterNode.fileName);
                 if (cachedPdf) relevantFiles.push(cachedPdf);
             }
 
-            const apiHistory: ConversationTurn[] = chatHistory
+            const apiHistory: ConversationTurn[] = currentHistory
                 .filter(h => h.status === 'done')
                 .map(h => ({
                     query: h.role === 'user' ? h.content : '',
@@ -122,23 +116,64 @@ export const ChapterView: React.FC = () => {
                 .filter(h => h.query || h.response.answer);
 
             const parsedRes = await analyzeFiles(
-                text,
+                query,
                 relevantFiles,
                 apiHistory,
                 {
-                    chapterTitle: chapter.chapterTitle,
-                    chapterId: chapter.chapterId,
+                    chapterTitle: chapter!.chapterTitle,
+                    chapterId: chapter!.chapterId,
                     pageOffset: 0,
-                    mindMap: chapter.mindMap
+                    mindMap: chapter!.mindMap
                 }
             );
 
-            const newHistory = [...chatHistory, userMsg, { id: `${msgId}_a`, role: 'assistant', content: parsedRes.answer, parsed: parsedRes, status: 'done', timestamp: Date.now() + 1 }];
-            setChatHistory(newHistory);
-            await dbService.saveConversationHistory(user.email, subjectId!, chapterId!, newHistory);
+            setChatHistory(prev => {
+                const newHistory = prev.map(m => m.id === assistantMsgId ? { ...m, content: parsedRes.answer, parsed: parsedRes, status: 'done', timestamp: Date.now() + 1 } : m);
+                dbService.saveConversationHistory(user!.email, subjectId!, chapterId!, newHistory).catch(console.error);
+                return newHistory;
+            });
         } catch (err: any) {
-            setChatHistory(prev => prev.map(m => m.id === `${msgId}_a` ? { ...m, content: err.message || 'Failed to generate response.', status: 'error' } : m));
+            setChatHistory(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: err.message || 'Failed to generate response.', status: 'error' } : m));
         }
+    };
+
+    const handleSendMsg = async (text: string) => {
+        if (!text.trim() || !user || !subject || !chapter) return;
+        const msgId = Date.now().toString();
+        const userMsg = { id: `${msgId}_u`, role: 'user', content: text, status: 'done', timestamp: Date.now() };
+        const astMsg = { id: `${msgId}_a`, role: 'assistant', content: '', status: 'sending', timestamp: Date.now() + 1 };
+
+        const newHist = [...chatHistory, userMsg, astMsg];
+        setChatHistory(newHist);
+        triggerGeneration(text, chatHistory, astMsg.id); // pass old history
+    };
+
+    const handleEditMsg = (msgId: string, newText: string) => {
+        if (!newText.trim()) return;
+        const idx = chatHistory.findIndex(m => m.id === msgId);
+        if (idx === -1) return;
+
+        const historySlice = chatHistory.slice(0, idx); // everything before this user message
+        const newMsgId = Date.now().toString();
+        const userMsg = { id: `${newMsgId}_u`, role: 'user', content: newText, status: 'done', timestamp: Date.now() };
+        const astMsg = { id: `${newMsgId}_a`, role: 'assistant', content: '', status: 'sending', timestamp: Date.now() + 1 };
+
+        setChatHistory([...historySlice, userMsg, astMsg]);
+        triggerGeneration(newText, historySlice, astMsg.id);
+    };
+
+    const handleRegenerateMsg = (msgId: string) => {
+        const idx = chatHistory.findIndex(m => m.id === msgId);
+        if (idx === -1) return;
+
+        const prevMsg = chatHistory[idx - 1];
+        if (!prevMsg || prevMsg.role !== 'user') return;
+
+        const historySlice = chatHistory.slice(0, idx); // up to the assistant message
+        const newAstMsg = { id: `${Date.now()}_a`, role: 'assistant', content: '', status: 'sending', timestamp: Date.now() + 1 };
+
+        setChatHistory([...historySlice, newAstMsg]);
+        triggerGeneration(prevMsg.content, chatHistory.slice(0, idx - 1), newAstMsg.id);
     };
 
     if (loading) return <LoadingSpinner fullScreen label="Preparing ALUCIDATE..." />;
@@ -274,7 +309,9 @@ export const ChapterView: React.FC = () => {
                             <TutorPanel
                                 chatHistory={chatHistory}
                                 onSend={handleSendMsg}
-                                onExpandToggle={() => setLeftPanelWidth(l => l <= 40 ? 58 : 30)}
+                                onEdit={handleEditMsg}
+                                onRegenerate={handleRegenerateMsg}
+                                onExpandToggle={() => setLeftPanelWidth(l => l <= 40 ? 58 : 40)}
                                 isExpanded={leftPanelWidth <= 40}
                                 selectedNode={selectedNode}
                                 onClearNode={() => setSelectedNode(null)}

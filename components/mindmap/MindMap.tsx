@@ -206,8 +206,10 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
                 dragElastic={0.1}
                 dragTransition={{ power: 0.2, timeConstant: 200 }}
                 onDrag={(_, info) => {
-                    panX.set(panX.get() + info.delta.x);
-                    panY.set(panY.get() + info.delta.y);
+                    const nextX = panX.get() + info.delta.x;
+                    const nextY = panY.get() + info.delta.y;
+                    panX.set(Math.min(4000, Math.max(dimensions.w - 8000, nextX)));
+                    panY.set(Math.min(4000, Math.max(dimensions.h - 8000, nextY)));
                 }}
                 whileDrag={{ cursor: 'grabbing' }}
                 className="absolute left-0 top-0 w-[8000px] h-[8000px] origin-top-left"
