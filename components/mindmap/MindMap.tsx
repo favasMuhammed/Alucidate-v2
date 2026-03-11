@@ -88,57 +88,60 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
     };
 
     useEffect(() => {
-        if (containerRef.current) {
-            const h = containerRef.current.clientHeight;
-            setDimensions({ w: containerRef.current.clientWidth, h });
-            panX.set(100);
-            panY.set(h / 2 - 400); // Approximate center initial load
-        }
-    }, [data, panX, panY]);
+        if (!containerRef.current) return;
+
+        const observer = new ResizeObserver(entries => {
+            if (entries[0]) {
+                const { width, height } = entries[0].contentRect;
+                setDimensions(prev => {
+                    // Only update and re-center if dimensions significantly changed
+                    if (Math.abs(prev.w - width) > 10 || Math.abs(prev.h - height) > 10) {
+                        panX.set(width / 2 - 4000);
+                        panY.set(height / 2 - 4000);
+                        return { w: width, h: height };
+                    }
+                    return prev;
+                });
+            }
+        });
+
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, [panX, panY]);
 
     // ── Dynamic Layout Engine ──
     const layoutNodes = useMemo(() => {
         const nodes: SVGNode[] = [];
-        const levelCounts: Record<number, number> = {};
         const levelSpacing = 320;
-        const verticalSpacing = 110;
+        const baseVerticalSpacing = 110;
 
-        const countNodes = (node: MindMapNodeType, level: number) => {
-            levelCounts[level] = (levelCounts[level] || 0) + 1;
-            if (expandedNodes.has(node.id)) {
-                node.children?.forEach(c => countNodes(c, level + 1));
+        const getSubtreeHeight = (node: MindMapNodeType): number => {
+            if (!expandedNodes.has(node.id) || !node.children || node.children.length === 0) {
+                return baseVerticalSpacing;
             }
+            return node.children.reduce((sum, c) => sum + getSubtreeHeight(c), 0);
         };
-        countNodes(data, 0);
 
-        const levelCurrentIdx: Record<number, number> = {};
-        const heightBound = Math.max(dimensions.h, 800);
-
-        const traverse = (node: MindMapNodeType, level: number, parent?: SVGNode): SVGNode => {
-            const idx = levelCurrentIdx[level] || 0;
-            levelCurrentIdx[level] = idx + 1;
-
-            const totalAtLevel = levelCounts[level] || 1;
-            let x = level * levelSpacing + 300;
-            let y = (heightBound / 2) - ((totalAtLevel * verticalSpacing) / 2) + (idx * verticalSpacing);
-
-            if (parent && level > 1) {
-                // Pin child relative to parent
-                y = parent.y + ((idx - ((totalAtLevel - 1) / 2)) * verticalSpacing * 0.6);
-            }
-
+        const buildLayout = (node: MindMapNodeType, level: number, x: number, y: number, parent?: SVGNode) => {
             const mapped: SVGNode = { ...node, x, y, level, parent };
             nodes.push(mapped);
 
-            if (expandedNodes.has(node.id)) {
-                node.children?.forEach(c => traverse(c, level + 1, mapped));
+            if (expandedNodes.has(node.id) && node.children && node.children.length > 0) {
+                const totalHeight = getSubtreeHeight(node);
+                let currentY = y - totalHeight / 2;
+
+                node.children.forEach(child => {
+                    const childHeight = getSubtreeHeight(child);
+                    const childY = currentY + childHeight / 2;
+                    buildLayout(child, level + 1, x + levelSpacing, childY, mapped);
+                    currentY += childHeight;
+                });
             }
-            return mapped;
         };
 
-        traverse(data, 0);
+        buildLayout(data, 0, 4000, 4000); // Position root in exact center of 8000x8000 canvas
         return nodes;
-    }, [data, dimensions, expandedNodes]);
+    }, [data, expandedNodes]);
 
     // Handle Zoom
     const handleWheel = (e: React.WheelEvent) => {
@@ -312,7 +315,7 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
                     −
                 </button>
                 <button
-                    onClick={() => { setTargetScale(1); panX.set(dimensions.w / 2 - 300); panY.set(dimensions.h / 2 - Math.max(dimensions.h, 800) / 2); }}
+                    onClick={() => { setTargetScale(1); panX.set(dimensions.w / 2 - 4000); panY.set(dimensions.h / 2 - 4000); }}
                     className="w-[72px] h-9 flex items-center justify-center bg-raised-2 hover:bg-raised hover:text-ink transition-colors font-mono text-[10px] tracking-[0.1em] text-ink-2 uppercase"
                 >
                     Center
