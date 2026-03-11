@@ -114,7 +114,7 @@ export const generateChapterDetails_Interactive = async (
     chapterPdfFile: FileContent,
     chapterNumber: number
 ): Promise<Omit<ChapterDetails, 'id' | 'subjectId' | 'chapterId'>> => {
-    const model = "gemini-2.0-flash";
+    const model = "gemini-2.5-flash";
     const systemInstruction = `You are an expert academic assistant. The user has provided an educational document. This could be a single chapter OR a full textbook containing many chapters. Your task is to generate a comprehensive, interactive learning module for this specific document.
 
     Instructions:
@@ -154,7 +154,7 @@ export const identifyRelevantNodes = async (
     mindMap: MindMapNode,
     limit: number = 3
 ): Promise<string[]> => {
-    const model = "gemini-2.0-flash"; // Use faster model for reasoning
+    const model = "gemini-2.5-flash"; // Use faster model for reasoning
     const systemInstruction = `You are a document navigation assistant. Given a student's query and a hierarchical MindMap of a textbook, identify the top ${limit} most relevant section IDs (e.g., "1.2.1"). 
     Focus on finding the exact nodes that would contain the answer. Return only a JSON array of strings.`;
 
@@ -239,7 +239,7 @@ export const analyzeFiles = async (
     conversationHistory: ConversationTurn[],
     chapterContext?: { chapterTitle: string; chapterId: string; pageOffset: number; mindMap?: MindMapNode; }
 ): Promise<TutorResponse> => {
-    const model = "gemini-2.0-flash";
+    const model = "gemini-2.5-flash";
 
     // Vectorless RAG Step: If mindMap is provided, identify high-density sections first
     let focusedContext = "";
