@@ -66,16 +66,7 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
     const springScale = useSpring(targetScale, { stiffness: 200, damping: 30 });
 
     // ── Expand/Collapse State ──
-    const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
-        const set = new Set<string>();
-        // Auto-expand Root (Level 0) by default
-        const traverse = (n: MindMapNodeType, level: number) => {
-            if (level < 1) set.add(n.id);
-            n.children?.forEach(c => traverse(c, level + 1));
-        };
-        traverse(data, 0);
-        return set;
-    });
+    const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => new Set<string>());
 
     const toggleExpand = (nodeId: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -227,11 +218,10 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
                         return (
                             <motion.div
                                 key={node.id}
-                                layoutId={`node-${node.id}`}
                                 initial={{
                                     opacity: 0,
-                                    scale: isRoot ? 0.9 : 1,
-                                    x: isRoot ? node.x : node.x - 20,
+                                    scale: 0.9,
+                                    x: node.x,
                                     y: node.y
                                 }}
                                 animate={{
@@ -240,12 +230,11 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
                                     x: node.x,
                                     y: node.y
                                 }}
-                                exit={{ opacity: 0, scale: 0.9, x: node.x - 20, y: node.y }}
+                                exit={{ opacity: 0, scale: 0.9, x: node.x, y: node.y }}
                                 transition={{
                                     type: 'spring',
-                                    stiffness: isRoot ? 260 : (node.level === 1 ? 200 : 280),
-                                    damping: isRoot ? 20 : (node.level === 1 ? 25 : 22),
-                                    delay: isRoot ? 0.05 : (i % 10) * (node.level === 1 ? 0.07 : 0.04)
+                                    stiffness: 250,
+                                    damping: 25
                                 }}
                                 onClick={(e) => { e.stopPropagation(); onNodeSelect(node); }}
                                 onPointerDown={(e) => e.stopPropagation()}
