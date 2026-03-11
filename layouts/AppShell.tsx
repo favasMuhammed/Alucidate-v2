@@ -26,7 +26,7 @@ export const AppShell: React.FC = () => {
             <TopBar />
 
             {/* ── Main Content Area ── */}
-            <main className="flex-1 w-full max-w-[1280px] mx-auto pt-14 flex flex-col min-w-0">
+            <main className="flex-1 w-full pt-[56px] flex flex-col min-w-0">
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={location.pathname}

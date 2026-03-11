@@ -172,11 +172,8 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
     return (
         <div
             ref={containerRef}
-            className="w-full relative overflow-hidden bg-void mindmap-canvas touch-none font-sans"
-            style={{
-                height: 'calc(100vh - 112px)',
-                cursor: 'grab'
-            }}
+            className="w-full h-full relative overflow-hidden bg-void mindmap-canvas touch-none font-sans"
+            style={{ cursor: 'grab' }}
             onWheel={handleWheel}
         >
             <motion.div
@@ -291,8 +288,8 @@ export const MindMap: React.FC<MindMapProps> = ({ data, onNodeSelect, activeNode
                                         onClick={(e) => toggleExpand(node.id, e)}
                                         onPointerDown={(e) => e.stopPropagation()}
                                         className={`absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${isExpanded
-                                                ? 'bg-raised-2 text-ink-3 hover:text-ink hover:bg-raised'
-                                                : 'bg-brand text-white shadow-[0_0_12px_rgba(59,130,246,0.4)]'
+                                            ? 'bg-raised-2 text-ink-3 hover:text-ink hover:bg-raised'
+                                            : 'bg-brand text-white shadow-[0_0_12px_rgba(59,130,246,0.4)]'
                                             }`}
                                     >
                                         <motion.div animate={{ rotate: isExpanded ? 45 : 0 }}>

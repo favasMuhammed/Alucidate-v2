@@ -140,41 +140,43 @@ export const TutorPanel: React.FC<TutorPanelProps> = ({ chatHistory, onSend, onE
 
             {/* ── Messages Area ── */}
             <div className="flex-1 overflow-y-auto px-4 md:px-6 relative scroll-smooth bg-void">
-                {chatHistory.length === 0 ? (
-                    <div className="min-h-full flex flex-col justify-center items-center py-10">
-                        <Brain className="w-8 h-8 text-purple animate-float mb-6 drop-shadow-[0_0_12px_rgba(167,139,250,0.5)]" />
-                        <h2 className="font-[Instrument_Serif] text-[24px] text-ink mb-2">
-                            <TypingGreeting text={`Hello, ${user?.name?.split(' ')[0] || 'Student'}.`} />
-                        </h2>
-                        <p className="font-[Geist] font-normal text-[14px] text-ink-3 text-center mb-8 max-w-[280px]">
-                            Ask me anything about {subjectName}.
-                        </p>
-                        <div className="flex flex-col gap-2 w-full max-w-[320px]">
-                            {["Explain the key concept in detail", "What are the most important formulas?", "Generate a practice question"].map((prompt, i) => (
-                                <motion.button
-                                    key={i}
-                                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 * i, ease: 'easeOut' }}
-                                    onClick={() => handleActionSend(prompt)}
-                                    className="w-full text-left bg-raised border border-border text-[13px] text-ink-2 rounded-[var(--r-md)] px-3.5 py-2.5 hover:border-border-focus hover:text-ink hover:bg-raised-2 transition-all transition-colors duration-200"
-                                >
-                                    {prompt}
-                                </motion.button>
+                <div className="max-w-[800px] mx-auto w-full flex flex-col h-full">
+                    {chatHistory.length === 0 ? (
+                        <div className="min-h-full flex flex-col justify-center items-center py-10 my-auto">
+                            <Brain className="w-8 h-8 text-purple animate-float mb-6 drop-shadow-[0_0_12px_rgba(167,139,250,0.5)]" />
+                            <h2 className="font-[Instrument_Serif] text-[24px] text-ink mb-2">
+                                <TypingGreeting text={`Hello, ${user?.name?.split(' ')[0] || 'Student'}.`} />
+                            </h2>
+                            <p className="font-[Geist] font-normal text-[14px] text-ink-3 text-center mb-8 max-w-[280px]">
+                                Ask me anything about {subjectName}.
+                            </p>
+                            <div className="flex flex-col gap-2 w-full max-w-[320px]">
+                                {["Explain the key concept in detail", "What are the most important formulas?", "Generate a practice question"].map((prompt, i) => (
+                                    <motion.button
+                                        key={i}
+                                        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 * i, ease: 'easeOut' }}
+                                        onClick={() => handleActionSend(prompt)}
+                                        className="w-full text-left bg-raised border border-border text-[13px] text-ink-2 rounded-[var(--r-md)] px-3.5 py-2.5 hover:border-border-focus hover:text-ink hover:bg-raised-2 transition-all transition-colors duration-200"
+                                    >
+                                        {prompt}
+                                    </motion.button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="py-6 space-y-6 flex flex-col w-full">
+                            {chatHistory.map((msg, i) => (
+                                msg.role === 'user' ? (
+                                    <motion.div key={msg.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 280, damping: 24 }} className="self-end max-w-[85%] bg-brand text-white rounded-[18px_18px_4px_18px] px-4 py-2.5 shadow-[0_2px_8px_rgba(59,130,246,0.25)]">
+                                        <p className="font-[Geist] font-normal text-[14px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                                    </motion.div>
+                                ) : (
+                                    <AIMessage key={msg.id} message={msg} />
+                                )
                             ))}
                         </div>
-                    </div>
-                ) : (
-                    <div className="py-6 space-y-6 flex flex-col">
-                        {chatHistory.map((msg, i) => (
-                            msg.role === 'user' ? (
-                                <motion.div key={msg.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 280, damping: 24 }} className="self-end max-w-[85%] bg-brand text-white rounded-[18px_18px_4px_18px] px-4 py-2.5 shadow-[0_2px_8px_rgba(59,130,246,0.25)]">
-                                    <p className="font-[Geist] font-normal text-[14px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                                </motion.div>
-                            ) : (
-                                <AIMessage key={msg.id} message={msg} />
-                            )
-                        ))}
-                    </div>
-                )}
+                    )}
+                </div>
                 <div ref={endRef} className="h-6" />
             </div>
 

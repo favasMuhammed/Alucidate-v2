@@ -185,10 +185,10 @@ export const ChapterView: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col h-screen w-full bg-void font-sans pt-[56px] overflow-hidden">
+        <div className="flex flex-col h-[calc(100vh-56px)] w-full bg-void font-sans overflow-hidden">
 
             {/* ── Chapter TopBar (Desktop mostly, mobile partially) ── */}
-            <div className="sticky top-[56px] h-[52px] bg-surface/80 backdrop-blur-[20px] border-b border-border z-[90] flex items-center justify-between px-4 shrink-0 shadow-sm" style={{ WebkitBackdropFilter: 'blur(20px)' }}>
+            <div className="sticky top-0 h-[52px] bg-surface/80 backdrop-blur-[20px] border-b border-border z-[90] flex items-center justify-between px-4 shrink-0 shadow-sm" style={{ WebkitBackdropFilter: 'blur(20px)' }}>
                 {/* Left: Back & Title */}
                 <div className="flex items-center gap-1 sm:gap-2 overflow-hidden flex-1 select-none">
                     <button onClick={() => navigate(`/subject/${subjectId}`)} className="p-1.5 rounded-lg hover:bg-raised text-ink-2 hover:text-ink transition-colors group">
@@ -262,12 +262,13 @@ export const ChapterView: React.FC = () => {
                 {/* Right Panel / Tutor Chat */}
                 {!isMobile && (
                     <motion.div
+                        initial={false}
                         animate={{
-                            width: chatOpen ? `${100 - leftPanelWidth}%` : '0%',
+                            flex: chatOpen ? 1 : 0,
                             opacity: chatOpen ? 1 : 0
                         }}
                         transition={{ type: 'spring', stiffness: 200, damping: 30 }}
-                        className="h-full relative overflow-hidden bg-void border-l border-border z-10 flex-shrink-0"
+                        className="h-full relative overflow-hidden bg-void border-l border-border z-10 flex flex-col min-w-0"
                     >
                         {chatOpen && (
                             <TutorPanel
